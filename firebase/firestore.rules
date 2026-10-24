@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// PlanWise AI Firestore security rules.
+// The backend uses the Admin SDK (which bypasses these rules), so these rules
+// protect against any direct client access: a signed-in user may read/write
+// ONLY the events they own, and all nested plan/vendor data under them.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(resource) {
+      return request.auth != null
+        && resource.data.owner_id == request.auth.uid;
+    }
+
+    match /events/{eventId} {
+      allow read: if isOwner(resource);
+      allow create: if request.auth != null
+        && request.resource.data.owner_id == request.auth.uid;
+      allow update, delete: if isOwner(resource);
+
+      // Plans and metadata inherit ownership from the parent event.
+      match /{document=**} {
+        allow read, write: if request.auth != null
+          && get(/databases/$(database)/documents/events/$(eventId)).data.owner_id
+             == request.auth.uid;
+      }
+    }
+  }
+}
