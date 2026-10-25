@@ -16,10 +16,10 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ### Option A — Render
 
 1. New → Web Service → connect the repo, root directory `backend`.
-2. Runtime: Python 3.12.
-3. Build command: `pip install -r requirements.txt`
-4. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Environment variables (Dashboard → Environment):
+2. Build command: `pip install -r requirements.txt`
+3. Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. Environment variables (Dashboard → Environment):
+   - **`PYTHON_VERSION` = `3.12.10`** — REQUIRED. See the pitfall below.
    - `CORS_ORIGINS` = your deployed frontend origin (e.g. `https://planwise.vercel.app`)
    - `GEMINI_API_KEY` = your key (optional; omit to use the deterministic fallback)
    - `PERSISTENCE` = `firestore` (recommended for production) or `json`
@@ -27,6 +27,18 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
      `GOOGLE_APPLICATION_CREDENTIALS` (use Render "Secret Files").
 
 A ready-made [`render.yaml`](render.yaml) blueprint is included.
+
+> **Pitfall: Python version / `pydantic-core` build failure.**
+> Render defaults to the latest Python (e.g. 3.14). On 3.14 there is no prebuilt
+> wheel for `pydantic-core`, so pip tries to compile it from Rust and the build
+> fails with *"Read-only file system"* / *"maturin failed"*. Pin Python 3.12:
+> - This repo includes `backend/.python-version`, `backend/runtime.txt`, and a
+>   root `.python-version`, all set to `3.12.10`.
+> - If the service was created manually in the dashboard (not via `render.yaml`),
+>   it ignores `render.yaml` — so also set the `PYTHON_VERSION=3.12.10`
+>   environment variable in the dashboard, then **Clear build cache & deploy**.
+> - Make sure the service's **Root Directory is `backend`** so Render finds
+>   `requirements.txt` and `.python-version`.
 
 ### Option B — Railway / Fly.io / Azure App Service
 
