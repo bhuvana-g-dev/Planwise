@@ -13,6 +13,10 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 
+class StaleActivePlan(Exception):
+    """Raised by commit_approved_plan when the active version has advanced."""
+
+
 class Repository(ABC):
     # --- events ---
     @abstractmethod
@@ -39,6 +43,20 @@ class Repository(ABC):
 
     @abstractmethod
     def set_active_plan(self, event_id: str, plan_id: str) -> dict: ...
+
+    @abstractmethod
+    def commit_approved_plan(
+        self, event_id: str, plan: dict, expected_active_version: int
+    ) -> dict:
+        """Atomically activate a new plan iff the current active version matches.
+
+        Adds `plan`, marks it active and deactivates others — but only if the
+        currently active plan's version equals `expected_active_version`. This
+        is an atomic compare-and-swap that prevents two simultaneous approvals
+        from both succeeding. Raises `StaleActivePlan` if the version no longer
+        matches (someone else approved first).
+        """
+        ...
 
     # --- tasks ---
     @abstractmethod

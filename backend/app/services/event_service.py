@@ -15,6 +15,7 @@ from app.core.money import rupees_to_paise
 from app.models.change import ReplanRequest, ReplanResult
 from app.models.event import Event, EventCreate
 from app.models.plan import Plan, VendorQuote
+from app.repositories.base import StaleActivePlan
 from app.repositories.provider import get_repository
 from app.services import budget_service, change_engine, plan_generator, vendor_service
 
@@ -158,8 +159,14 @@ def approve_plan(event_id: str, proposed_plan: dict, base_version: int,
     plan.is_active = True
     plan.created_at = _now()
     stored = plan.model_dump(mode="json")
-    repo.add_plan(event_id, stored)
-    repo.set_active_plan(event_id, plan.id)
+
+    # Atomic compare-and-swap: only activates if the active version is still
+    # `base_version`. Two simultaneous approvals cannot both succeed; the loser
+    # gets StaleActivePlan -> surfaced as StalePlan (HTTP 409).
+    try:
+        repo.commit_approved_plan(event_id, stored, base_version)
+    except StaleActivePlan as exc:
+        raise StalePlan(str(exc)) from exc
 
     # Keep event budget in sync if this was a budget change.
     if plan.budget.budget_paise != event.budget_paise:

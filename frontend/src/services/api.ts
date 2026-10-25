@@ -20,12 +20,27 @@ export class ApiError extends Error {
   }
 }
 
+// Pluggable token provider. The app wires this to Firebase at startup; tests
+// and anonymous mode leave it returning null (no Authorization header sent).
+let tokenProvider: () => Promise<string | null> = async () => null;
+
+export function setTokenProvider(fn: () => Promise<string | null>) {
+  tokenProvider = fn;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+  const token = await tokenProvider();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   let resp: Response;
   try {
     resp = await fetch(`${BASE}${path}`, {
-      headers: { "Content-Type": "application/json" },
       ...init,
+      headers,
     });
   } catch {
     throw new ApiError(0, "Cannot reach the server. Is the backend running?");

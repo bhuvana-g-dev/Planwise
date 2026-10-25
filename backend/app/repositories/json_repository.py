@@ -105,6 +105,28 @@ class JsonRepository(Repository):
             self._write(db)
             return found
 
+    def commit_approved_plan(self, event_id: str, plan: dict,
+                             expected_active_version: int) -> dict:
+        from app.repositories.base import StaleActivePlan
+        with self._lock:
+            db = self._read()
+            plans = db["plans"].setdefault(event_id, [])
+            active = [p for p in plans if p.get("is_active")]
+            current_version = (
+                max((p.get("version", 0) for p in active), default=0)
+            )
+            if current_version != expected_active_version:
+                raise StaleActivePlan(
+                    f"active plan is version {current_version}, expected "
+                    f"{expected_active_version}"
+                )
+            for p in plans:
+                p["is_active"] = False
+            plan["is_active"] = True
+            plans.append(plan)
+            self._write(db)
+            return plan
+
     # ---- tasks ----
     def update_task(self, event_id: str, task_id: str, patch: dict) -> dict:
         with self._lock:

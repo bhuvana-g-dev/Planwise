@@ -63,14 +63,19 @@ Build output is `frontend/dist`.
 
 1. Import the repo, set **Root Directory** = `frontend`.
 2. Framework preset: Vite. Build command `npm run build`, output `dist`.
-3. Environment variable: `VITE_API_BASE_URL` = your backend URL.
+3. Environment variables:
+   - `VITE_API_BASE_URL` = your backend URL (e.g. `https://planwise-api.onrender.com`)
+   - Optional auth (only if enabling Firebase sign-in): `VITE_FIREBASE_API_KEY`,
+     `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`,
+     `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`,
+     `VITE_FIREBASE_APP_ID`. These are public web config values, not secrets.
 4. Deploy. (A SPA rewrite to `/index.html` is configured in
    [`frontend/vercel.json`](frontend/vercel.json).)
 
 ### Netlify
 
 1. Base directory `frontend`, build command `npm run build`, publish `dist`.
-2. Env var `VITE_API_BASE_URL`.
+2. Env vars: `VITE_API_BASE_URL` (and the optional `VITE_FIREBASE_*` set above).
 3. SPA redirect is handled by [`frontend/public/_redirects`](frontend/public/_redirects).
 
 ---
@@ -87,15 +92,33 @@ Build output is `frontend/dist`.
    ```
    firebase deploy --only firestore:rules
    ```
-5. To enforce ownership, also set `REQUIRE_AUTH=true` and have the frontend send
-   a Firebase ID token in the `Authorization: Bearer <token>` header.
+5. To enforce ownership, also set `REQUIRE_AUTH=true` and configure the frontend
+   `VITE_FIREBASE_*` vars so it sends a Firebase ID token in the
+   `Authorization: Bearer <token>` header.
+
+Full step-by-step (console screenshots-level detail) is in
+[`FIREBASE_SETUP.md`](FIREBASE_SETUP.md).
+
+> **Rollout order to avoid lockout:** deploy with `REQUIRE_AUTH=false` first,
+> verify the frontend sends tokens, then flip `REQUIRE_AUTH=true`. Setting it
+> true before the frontend sends tokens returns 401 for every request.
 
 ---
 
-## Post-deploy checklist
+## Post-deploy verification
 
-- [ ] `GET https://<backend>/health` returns `{"status":"ok", ...}`
-- [ ] Frontend loads and can create an event (check the browser network tab)
-- [ ] `CORS_ORIGINS` includes the exact frontend origin (scheme + host, no trailing slash)
-- [ ] Secrets are set via the platform's secret manager, not committed
-- [ ] If using Firestore, rules are deployed and `REQUIRE_AUTH` matches your auth setup
+Run these against the actually-deployed services (not localhost):
+
+- [ ] `GET https://<backend>/health` returns `{"status":"ok", "gemini_enabled":..., "persistence":..., "require_auth":...}`
+- [ ] Open the frontend, create an event, generate a plan — confirm it appears
+- [ ] In the browser network tab: requests go to `VITE_API_BASE_URL`, and (if
+      auth on) carry an `Authorization: Bearer` header
+- [ ] Reduce the budget, see a proposal, approve it, refresh — the new version persists
+- [ ] `CORS_ORIGINS` on the backend lists the exact frontend origin (scheme +
+      host, no trailing slash) — otherwise the browser blocks requests
+- [ ] No secrets committed; service-account JSON is only in the host secret store
+- [ ] If Firestore: rules deployed, and `REQUIRE_AUTH` matches the frontend's auth config
+
+> **Deployment status honesty:** I have not deployed these services to your
+> Render/Vercel accounts and cannot verify a live URL from here. The above is
+> the exact procedure and checklist to verify it yourself.

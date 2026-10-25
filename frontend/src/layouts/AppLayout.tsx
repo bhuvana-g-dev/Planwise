@@ -1,8 +1,16 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { CalendarHeart, LayoutDashboard, PlusCircle } from "lucide-react";
+import {
+  CalendarHeart,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  PlusCircle,
+} from "lucide-react";
 import { classNames } from "../utils/format";
+import { useAuth } from "../hooks/useAuth";
 
 export default function AppLayout() {
+  const { enabled, user, loading, signIn, logout } = useAuth();
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
@@ -23,6 +31,32 @@ export default function AppLayout() {
               <PlusCircle className="h-4 w-4" aria-hidden />
               New Event
             </NavLink>
+            {enabled && !loading && (
+              <div className="ml-2 flex items-center gap-2">
+                {user ? (
+                  <>
+                    <span className="hidden text-sm text-slate-500 sm:inline">
+                      {user.displayName ?? user.email}
+                    </span>
+                    <button
+                      className="btn-secondary"
+                      onClick={() => void logout()}
+                      aria-label="Sign out"
+                    >
+                      <LogOut className="h-4 w-4" /> Sign out
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="btn-secondary"
+                    onClick={() => void signIn()}
+                    aria-label="Sign in"
+                  >
+                    <LogIn className="h-4 w-4" /> Sign in
+                  </button>
+                )}
+              </div>
+            )}
           </nav>
         </div>
       </header>

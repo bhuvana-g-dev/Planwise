@@ -116,14 +116,42 @@ See [`.env.example`](.env.example). Backend reads `backend/.env`; frontend reads
 | `GOOGLE_APPLICATION_CREDENTIALS` | backend | _(empty)_ | Path to service account JSON (never commit) |
 | `REQUIRE_AUTH` | backend | `false` | `true` enforces Firebase ID tokens + ownership |
 | `VITE_API_BASE_URL` | frontend | `http://localhost:8000` | Production API URL |
+| `VITE_FIREBASE_*` | frontend | _(empty)_ | 6 Firebase web config values; empty → anonymous mode |
 
-Enabling Gemini or Firestore requires **no code changes** — just set the vars.
+Enabling Gemini, Firestore or Auth requires **no code changes** — just set the vars.
+
+---
+
+## Authentication (optional Firebase Auth)
+
+Auth is **fully implemented and off by default** so the app runs with zero
+config. Enable it by setting the Firebase env vars on both sides.
+
+- **Frontend**: set the 6 `VITE_FIREBASE_*` vars. A Google sign-in / sign-out
+  control appears in the header. On sign-in the app automatically attaches the
+  Firebase **ID token** as `Authorization: Bearer <token>` on every API call.
+  With the vars empty, the app stays in anonymous mode and sends no token.
+- **Backend**: set `REQUIRE_AUTH=true` plus Firebase Admin credentials
+  (`GOOGLE_APPLICATION_CREDENTIALS`, `FIREBASE_PROJECT_ID`). FastAPI then
+  verifies every token, derives the `uid`, stamps it as the event `owner_id`,
+  and **enforces ownership on every private endpoint** (get/list/plan/replan/
+  approve/task/vendor). Missing/empty token → `401`; another user's event →
+  `403`; expired/invalid token → `401` (no internal details leaked).
+
+> **Order matters:** do NOT set `REQUIRE_AUTH=true` in production until the
+> frontend is configured with the `VITE_FIREBASE_*` vars and actually sends
+> tokens — otherwise all requests get 401. See `FIREBASE_SETUP.md`.
+
+The Firebase web `apiKey` is a public project identifier (safe in the browser),
+**not** a secret. The real protections are the backend token verification and
+the Firestore security rules in `firebase/firestore.rules`. The Admin
+service-account JSON **is** a secret and is git-ignored.
 
 ---
 
 ## Testing
 
-### Backend (23 tests — covers all 18 required scenarios)
+### Backend (34 tests — covers all 18 required scenarios + auth + concurrency)
 
 ```powershell
 cd backend
@@ -140,13 +168,16 @@ cd backend
 This reproduces the demo: create → plan → reduce ₹30,000 → ₹24,000 → approve →
 stale-approval blocked (409) → reload shows v2 persisted.
 
-### Frontend
+### Frontend (10 tests)
 
 ```powershell
 cd frontend
 npm test          # vitest
 npm run build     # type-check + production build
 ```
+
+Tests mock Firebase and external services — no credentials needed to run the
+suite.
 
 ### Required test scenarios → where they live
 
@@ -168,8 +199,9 @@ npm run build     # type-check + production build
 | 14 | Preserve plan after rejection | `test_api.py::test_reject_leaves_plan_intact` |
 | 15 | Prevent stale approval | `test_api.py::test_approve_and_stale_rejection` |
 | 16 | Reload persisted event | `test_api.py::test_reload_persisted_event` |
-| 17 | Enforce ownership (auth) | `event_service._check_owner` + `deps.get_current_owner` |
+| 17 | Enforce ownership (auth) | `test_auth_ownership.py` (7 tests: cross-user 403, scoped list, private-op enforcement, 401 handling, uid stamping) |
 | 18 | Dashboard reflects saved data | `test_api.py::test_dashboard_reflects_saved_...` |
+| + | Concurrent approvals are safe | `test_concurrency.py` (atomic CAS, only one approval wins, reject leaves plan intact) |
 
 ---
 

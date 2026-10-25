@@ -8,24 +8,15 @@ from __future__ import annotations
 
 from typing import Optional
 
-from app.core.config import get_settings
-from app.repositories.base import Repository
+from app.repositories.base import Repository, StaleActivePlan
 
 
 class FirestoreRepository(Repository):
     def __init__(self) -> None:
-        import firebase_admin
-        from firebase_admin import credentials, firestore
+        from app.core.firebase import ensure_firebase_app
+        from firebase_admin import firestore
 
-        settings = get_settings()
-        if not firebase_admin._apps:
-            if settings.google_application_credentials:
-                cred = credentials.Certificate(settings.google_application_credentials)
-                firebase_admin.initialize_app(cred, {
-                    "projectId": settings.firebase_project_id or None,
-                })
-            else:
-                firebase_admin.initialize_app()
+        ensure_firebase_app()
         self.db = firestore.client()
 
     # ---- events ----
@@ -75,6 +66,37 @@ class FirestoreRepository(Repository):
         if found is None:
             raise KeyError(plan_id)
         return found
+
+    def commit_approved_plan(self, event_id: str, plan: dict,
+                             expected_active_version: int) -> dict:
+        from firebase_admin import firestore
+
+        plans_col = (
+            self.db.collection("events").document(event_id).collection("plans")
+        )
+
+        @firestore.transactional
+        def _txn(transaction):
+            # Read all plans inside the transaction for a consistent snapshot.
+            docs = list(plans_col.stream(transaction=transaction))
+            active = [d.to_dict() for d in docs if d.to_dict().get("is_active")]
+            current_version = max(
+                (p.get("version", 0) for p in active), default=0
+            )
+            if current_version != expected_active_version:
+                raise StaleActivePlan(
+                    f"active plan is version {current_version}, expected "
+                    f"{expected_active_version}"
+                )
+            for d in docs:
+                transaction.update(plans_col.document(d.id), {"is_active": False})
+            new_ref = plans_col.document(plan["id"])
+            plan["is_active"] = True
+            transaction.set(new_ref, plan)
+            return plan
+
+        transaction = self.db.transaction()
+        return _txn(transaction)
 
     # ---- tasks ----
     def update_task(self, event_id: str, task_id: str, patch: dict) -> dict:
