@@ -151,7 +151,7 @@ service-account JSON **is** a secret and is git-ignored.
 
 ## Testing
 
-### Backend (34 tests — covers all 18 required scenarios + auth + concurrency)
+### Backend (38 tests — 18 required scenarios + auth + concurrency + guests)
 
 ```powershell
 cd backend
@@ -168,7 +168,7 @@ cd backend
 This reproduces the demo: create → plan → reduce ₹30,000 → ₹24,000 → approve →
 stale-approval blocked (409) → reload shows v2 persisted.
 
-### Frontend (10 tests)
+### Frontend (11 tests)
 
 ```powershell
 cd frontend
@@ -209,6 +209,8 @@ suite.
 
 | Method | Path | Purpose |
 |---|---|---|
+| GET | `/api/events/{id}/guests` | List guests + deterministic RSVP summary |
+| PUT | `/api/events/{id}/guests` | Replace guest list (ids assigned, summary recomputed) |
 | POST | `/api/events` | Create an event |
 | GET | `/api/events` | List events |
 | GET | `/api/events/{id}` | Event + active plan + versions + vendors |

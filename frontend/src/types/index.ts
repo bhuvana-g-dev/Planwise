@@ -179,9 +179,35 @@ export interface VendorComparison {
   notes: string[];
 }
 
+export type RsvpStatus = "invited" | "confirmed" | "declined" | "tentative";
+
+export interface Guest {
+  id?: string;
+  name: string;
+  group: string;
+  rsvp: RsvpStatus;
+  plus_ones: number;
+  dietary: string[];
+  accessibility: string[];
+  contact: string;
+  notes: string;
+}
+
+export interface GuestSummary {
+  total_guests: number;
+  total_headcount: number;
+  confirmed_headcount: number;
+  by_status: Record<string, number>;
+  by_group: Record<string, number>;
+  dietary_counts: Record<string, number>;
+  accessibility_counts: Record<string, number>;
+}
+
 export interface EventDetail {
   event: EventRecord;
   active_plan: Plan | null;
   plans: Plan[];
   vendors: VendorQuote[];
+  guests: Guest[];
+  guest_summary: GuestSummary;
 }

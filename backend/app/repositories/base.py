@@ -68,3 +68,10 @@ class Repository(ABC):
 
     @abstractmethod
     def list_vendor_quotes(self, event_id: str) -> list[dict]: ...
+
+    # --- guests ---
+    @abstractmethod
+    def list_guests(self, event_id: str) -> list[dict]: ...
+
+    @abstractmethod
+    def save_guests(self, event_id: str, guests: list[dict]) -> list[dict]: ...

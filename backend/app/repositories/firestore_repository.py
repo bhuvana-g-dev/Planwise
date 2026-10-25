@@ -122,3 +122,14 @@ class FirestoreRepository(Repository):
         doc = self.db.collection("events").document(event_id) \
             .collection("meta").document("vendors").get()
         return doc.to_dict().get("quotes", []) if doc.exists else []
+
+    # ---- guests ----
+    def list_guests(self, event_id: str) -> list[dict]:
+        doc = self.db.collection("events").document(event_id) \
+            .collection("meta").document("guests").get()
+        return doc.to_dict().get("guests", []) if doc.exists else []
+
+    def save_guests(self, event_id: str, guests: list[dict]) -> list[dict]:
+        self.db.collection("events").document(event_id) \
+            .collection("meta").document("guests").set({"guests": guests})
+        return guests

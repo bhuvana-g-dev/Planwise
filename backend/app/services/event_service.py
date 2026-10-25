@@ -204,3 +204,45 @@ def compare_vendors(event_id: str, quotes: list[VendorQuote],
 def list_vendors(event_id: str, owner_id: Optional[str]) -> list[dict]:
     get_event(event_id, owner_id)
     return get_repository().list_vendor_quotes(event_id)
+
+
+# --------------------------------------------------------------------------
+# Guests
+# --------------------------------------------------------------------------
+def list_guests(event_id: str, owner_id: Optional[str]) -> list[dict]:
+    get_event(event_id, owner_id)
+    return get_repository().list_guests(event_id)
+
+
+def save_guests(event_id: str, guests: list, owner_id: Optional[str]):
+    """Replace the guest list (full-list upsert). Assigns ids where missing and
+    returns the stored guests plus a deterministic summary."""
+    from app.models.guest import Guest, GuestCreate
+    from app.services import guest_service
+
+    get_event(event_id, owner_id)
+    normalized: list[Guest] = []
+    for g in guests:
+        if isinstance(g, Guest):
+            guest = g
+        elif isinstance(g, GuestCreate):
+            guest = Guest(id=f"g-{uuid.uuid4().hex[:8]}", **g.model_dump())
+        else:  # dict
+            gid = g.get("id") or f"g-{uuid.uuid4().hex[:8]}"
+            guest = Guest(id=gid, **{k: v for k, v in g.items() if k != "id"})
+        normalized.append(guest)
+
+    stored = [g.model_dump(mode="json") for g in normalized]
+    get_repository().save_guests(event_id, stored)
+    summary = guest_service.summarize(normalized)
+    return {"guests": stored, "summary": summary.model_dump(mode="json")}
+
+
+def guest_summary(event_id: str, owner_id: Optional[str]):
+    from app.models.guest import Guest
+    from app.services import guest_service
+
+    get_event(event_id, owner_id)
+    rows = get_repository().list_guests(event_id)
+    guests = [Guest.model_validate(r) for r in rows]
+    return guest_service.summarize(guests)

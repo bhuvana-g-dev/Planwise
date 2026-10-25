@@ -23,7 +23,7 @@ class JsonRepository(Repository):
         self._lock = threading.RLock()
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if not self._path.exists():
-            self._write({"events": {}, "plans": {}, "vendors": {}})
+            self._write({"events": {}, "plans": {}, "vendors": {}, "guests": {}})
 
     # ---- low level ----
     def _read(self) -> dict:
@@ -43,6 +43,7 @@ class JsonRepository(Repository):
             db["events"][event["id"]] = event
             db["plans"].setdefault(event["id"], [])
             db["vendors"].setdefault(event["id"], [])
+            db.setdefault("guests", {}).setdefault(event["id"], [])
             self._write(db)
             return event
 
@@ -154,3 +155,15 @@ class JsonRepository(Repository):
     def list_vendor_quotes(self, event_id: str) -> list[dict]:
         with self._lock:
             return list(self._read()["vendors"].get(event_id, []))
+
+    # ---- guests ----
+    def list_guests(self, event_id: str) -> list[dict]:
+        with self._lock:
+            return list(self._read().get("guests", {}).get(event_id, []))
+
+    def save_guests(self, event_id: str, guests: list[dict]) -> list[dict]:
+        with self._lock:
+            db = self._read()
+            db.setdefault("guests", {})[event_id] = guests
+            self._write(db)
+            return guests

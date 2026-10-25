@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from app.api.deps import get_current_owner
 from app.models.change import ReplanRequest
 from app.models.event import EventCreate
+from app.models.guest import GuestCreate
 from app.models.plan import VendorQuote
 from app.services import event_service
 from app.services.event_service import (
@@ -54,8 +55,11 @@ def get_event(event_id: str, owner=Depends(get_current_owner)):
         active = event_service.get_active_plan(event_id, owner)
         plans = event_service.list_plans(event_id, owner)
         vendors = event_service.list_vendors(event_id, owner)
+        guests = event_service.list_guests(event_id, owner)
+        guest_summary = event_service.guest_summary(event_id, owner)
         return {"event": event, "active_plan": active, "plans": plans,
-                "vendors": vendors}
+                "vendors": vendors, "guests": guests,
+                "guest_summary": guest_summary.model_dump(mode="json")}
     except Exception as exc:
         _handle(exc)
 
@@ -149,5 +153,34 @@ def compare_vendors(event_id: str, payload: VendorComparePayload,
 def list_vendors(event_id: str, owner=Depends(get_current_owner)):
     try:
         return event_service.list_vendors(event_id, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+# --------------------------------------------------------------------------
+# Guests
+# --------------------------------------------------------------------------
+class GuestListPayload(BaseModel):
+    guests: list[GuestCreate]
+
+
+@router.get("/events/{event_id}/guests")
+def list_guests(event_id: str, owner=Depends(get_current_owner)):
+    try:
+        return {
+            "guests": event_service.list_guests(event_id, owner),
+            "summary": event_service.guest_summary(event_id, owner).model_dump(
+                mode="json"
+            ),
+        }
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.put("/events/{event_id}/guests")
+def save_guests(event_id: str, payload: GuestListPayload,
+                owner=Depends(get_current_owner)):
+    try:
+        return event_service.save_guests(event_id, list(payload.guests), owner)
     except Exception as exc:
         _handle(exc)

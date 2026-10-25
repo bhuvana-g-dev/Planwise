@@ -2,6 +2,8 @@ import type {
   EventCreate,
   EventDetail,
   EventRecord,
+  Guest,
+  GuestSummary,
   Plan,
   ReplanRequest,
   ReplanResult,
@@ -102,4 +104,15 @@ export const api = {
     }),
 
   listVendors: (id: string) => request<VendorQuote[]>(`/api/events/${id}/vendors`),
+
+  listGuests: (id: string) =>
+    request<{ guests: Guest[]; summary: GuestSummary }>(
+      `/api/events/${id}/guests`
+    ),
+
+  saveGuests: (id: string, guests: Guest[]) =>
+    request<{ guests: Guest[]; summary: GuestSummary }>(
+      `/api/events/${id}/guests`,
+      { method: "PUT", body: JSON.stringify({ guests }) }
+    ),
 };

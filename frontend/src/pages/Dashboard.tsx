@@ -83,11 +83,52 @@ export default function Dashboard() {
           <Link to={`/events/${eventId}/timeline`} className="btn-secondary">
             <ListChecks className="h-4 w-4" /> Timeline
           </Link>
+          <Link to={`/events/${eventId}/guests`} className="btn-secondary">
+            <Users className="h-4 w-4" /> Guests
+          </Link>
           <Link to={`/events/${eventId}/vendors`} className="btn-secondary">
             Vendors
           </Link>
         </div>
       </div>
+
+      {data.guest_summary && data.guest_summary.total_guests > 0 && (
+        <div className="card p-5">
+          <h3 className="mb-3 flex items-center gap-2 font-semibold text-slate-900">
+            <Users className="h-5 w-5 text-brand-600" /> RSVP progress
+          </h3>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <RsvpStat
+              label="Confirmed heads"
+              value={data.guest_summary.confirmed_headcount}
+            />
+            <RsvpStat
+              label="Attending"
+              value={data.guest_summary.total_headcount}
+            />
+            <RsvpStat
+              label="Invited (rows)"
+              value={data.guest_summary.total_guests}
+            />
+            <RsvpStat
+              label="Declined"
+              value={data.guest_summary.by_status["declined"] ?? 0}
+            />
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Confirmed headcount ({data.guest_summary.confirmed_headcount}) vs
+            planned guests ({event.guest_count}).{" "}
+            {data.guest_summary.confirmed_headcount > event.guest_count && (
+              <Link
+                to={`/events/${eventId}/adapt`}
+                className="font-medium text-brand-600 hover:underline"
+              >
+                Confirmed exceeds plan — adapt guest count →
+              </Link>
+            )}
+          </p>
+        </div>
+      )}
 
       {genError && <ErrorBanner message={genError} />}
 
@@ -228,4 +269,13 @@ function PriorityBadge({ priority }: { priority: string }) {
       ? "brand"
       : "slate";
   return <Badge tone={tone as never}>{priority}</Badge>;
+}
+
+function RsvpStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <p className="text-xl font-bold text-slate-900">{value}</p>
+      <p className="text-xs text-slate-500">{label}</p>
+    </div>
+  );
 }
