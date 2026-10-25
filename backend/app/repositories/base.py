@@ -75,3 +75,10 @@ class Repository(ABC):
 
     @abstractmethod
     def save_guests(self, event_id: str, guests: list[dict]) -> list[dict]: ...
+
+    # --- catering ---
+    @abstractmethod
+    def get_catering(self, event_id: str) -> Optional[dict]: ...
+
+    @abstractmethod
+    def save_catering(self, event_id: str, plan: dict) -> dict: ...

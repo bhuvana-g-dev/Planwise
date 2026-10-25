@@ -23,7 +23,8 @@ class JsonRepository(Repository):
         self._lock = threading.RLock()
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if not self._path.exists():
-            self._write({"events": {}, "plans": {}, "vendors": {}, "guests": {}})
+            self._write({"events": {}, "plans": {}, "vendors": {},
+                         "guests": {}, "catering": {}})
 
     # ---- low level ----
     def _read(self) -> dict:
@@ -167,3 +168,15 @@ class JsonRepository(Repository):
             db.setdefault("guests", {})[event_id] = guests
             self._write(db)
             return guests
+
+    # ---- catering ----
+    def get_catering(self, event_id: str) -> Optional[dict]:
+        with self._lock:
+            return self._read().get("catering", {}).get(event_id)
+
+    def save_catering(self, event_id: str, plan: dict) -> dict:
+        with self._lock:
+            db = self._read()
+            db.setdefault("catering", {})[event_id] = plan
+            self._write(db)
+            return plan

@@ -211,3 +211,116 @@ export interface EventDetail {
   guests: Guest[];
   guest_summary: GuestSummary;
 }
+
+// --- Catering ---
+export type MenuCategory =
+  | "breakfast"
+  | "lunch"
+  | "dinner"
+  | "snacks"
+  | "starters"
+  | "main_course"
+  | "rice_breads"
+  | "desserts"
+  | "beverages"
+  | "custom";
+
+export type DietaryClass =
+  | "vegetarian"
+  | "non_vegetarian"
+  | "vegan"
+  | "mixed";
+
+export type PricingUnit = "per_serving" | "per_unit" | "per_package";
+export type CostSource = "estimate" | "user_quote";
+export type ItemStatus = "suggested" | "selected" | "rejected";
+
+export interface MenuItem {
+  id?: string;
+  name: string;
+  category: MenuCategory;
+  description: string;
+  dietary: DietaryClass;
+  cuisine: string;
+  allergen_notes: string;
+  servings_per_guest: number;
+  planned_quantity: number;
+  unit: string;
+  unit_cost_paise: number;
+  pricing_unit: PricingUnit;
+  cost_source: CostSource;
+  caterer: string;
+  status: ItemStatus;
+  required: boolean;
+  notes: string;
+  computed_quantity?: number;
+  total_cost_paise?: number;
+}
+
+export interface CateringPreferences {
+  cuisines: string[];
+  dietary_restrictions: string[];
+  allergies: string[];
+  serving_style: string;
+  meal_times: MenuCategory[];
+  required_dishes: string[];
+  prohibited_ingredients: string[];
+  budget_per_guest_inr: number | null;
+  vegetarian_only: boolean;
+}
+
+export interface CateringHeadcount {
+  planned_guests: number;
+  confirmed_headcount: number;
+  attending_headcount: number;
+  pending_responses: number;
+  plus_ones: number;
+  catering_headcount: number;
+  source: string;
+  override_differs: boolean;
+}
+
+export interface CategoryTotal {
+  category: string;
+  total_paise: number;
+  item_count: number;
+}
+
+export interface CateringSummary {
+  headcount: CateringHeadcount;
+  total_paise: number;
+  cost_per_guest_paise: number;
+  category_totals: CategoryTotal[];
+  catering_budget_paise: number | null;
+  remaining_paise: number | null;
+  overrun_paise: number | null;
+  within_budget: boolean | null;
+}
+
+export interface CateringPlan {
+  items: MenuItem[];
+  preferences: CateringPreferences;
+  headcount_override: number | null;
+}
+
+export interface CateringState {
+  plan: CateringPlan;
+  summary: CateringSummary;
+}
+
+export interface GenerateMenuResult {
+  generated_by: string;
+  state: CateringState;
+  allergy_notice: string | null;
+}
+
+export interface CateringOptimizeResult {
+  goal: string;
+  feasible: boolean;
+  before: CateringSummary;
+  after: CateringSummary;
+  proposed_plan: CateringPlan;
+  trade_offs: string[];
+  reasons: string[];
+  constraint_violations: string[];
+}

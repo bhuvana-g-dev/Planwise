@@ -246,3 +246,112 @@ def guest_summary(event_id: str, owner_id: Optional[str]):
     rows = get_repository().list_guests(event_id)
     guests = [Guest.model_validate(r) for r in rows]
     return guest_service.summarize(guests)
+
+
+# --------------------------------------------------------------------------
+# Catering
+# --------------------------------------------------------------------------
+def _catering_budget_paise(event_id: str) -> Optional[int]:
+    """Authoritative catering allocation = the active plan's 'catering' category."""
+    active = get_repository().get_active_plan(event_id)
+    if not active:
+        return None
+    totals = active.get("budget", {}).get("category_totals", {})
+    return totals.get("catering")
+
+
+def _load_catering_plan(event_id: str):
+    from app.models.catering import CateringPlan
+    raw = get_repository().get_catering(event_id)
+    return CateringPlan.model_validate(raw) if raw else CateringPlan()
+
+
+def _catering_state(event_id: str, plan, owner_id: Optional[str]):
+    """Compute the full catering state (plan with computed items + summary)."""
+    from app.models.catering import CateringState, ComputedCateringPlan
+    from app.services import catering_service
+
+    event = Event.model_validate(get_event(event_id, owner_id))
+    gsummary = guest_summary(event_id, owner_id)
+    budget = _catering_budget_paise(event_id)
+    items, summary = catering_service.compute(
+        plan, event.guest_count, gsummary, budget
+    )
+    computed_plan = ComputedCateringPlan(
+        items=items, preferences=plan.preferences,
+        headcount_override=plan.headcount_override,
+    )
+    return CateringState(plan=computed_plan, summary=summary)
+
+
+def get_catering(event_id: str, owner_id: Optional[str]):
+    get_event(event_id, owner_id)
+    plan = _load_catering_plan(event_id)
+    return _catering_state(event_id, plan, owner_id)
+
+
+def save_catering(event_id: str, plan, owner_id: Optional[str]):
+    from app.services import catering_service
+
+    get_event(event_id, owner_id)
+    plan = catering_service.assign_ids(plan)
+    errors = catering_service.validate_plan(plan)
+    if errors:
+        raise InvalidProposal("; ".join(errors))
+    # Persist the raw plan (quantities/totals are always recomputed on read).
+    get_repository().save_catering(event_id, plan.model_dump(mode="json"))
+    return _catering_state(event_id, plan, owner_id)
+
+
+def generate_catering_menu(event_id: str, prefs, owner_id: Optional[str]):
+    """Generate menu items (not persisted until the user saves). Returns a
+    proposed catering state plus metadata about how it was generated."""
+    from app.models.catering import CateringPlan
+    from app.services import catering_service, menu_ai
+
+    event = Event.model_validate(get_event(event_id, owner_id))
+    gsummary = guest_summary(event_id, owner_id)
+    budget = _catering_budget_paise(event_id)
+    hc = catering_service.resolve_headcount(event.guest_count, gsummary, None)
+
+    items, generated_by = menu_ai.generate_menu(
+        event.event_type, hc.catering_headcount, prefs,
+        prefs.budget_per_guest_inr,
+    )
+    proposed = CateringPlan(items=items, preferences=prefs)
+    proposed = catering_service.assign_ids(proposed)
+    state = _catering_state_from_plan(event, gsummary, budget, proposed)
+    return {
+        "generated_by": generated_by,
+        "state": state.model_dump(mode="json"),
+        "allergy_notice": catering_service.allergy_notice(proposed),
+    }
+
+
+def _catering_state_from_plan(event, gsummary, budget, plan):
+    from app.models.catering import CateringState, ComputedCateringPlan
+    from app.services import catering_service
+    items, summary = catering_service.compute(
+        plan, event.guest_count, gsummary, budget
+    )
+    computed_plan = ComputedCateringPlan(
+        items=items, preferences=plan.preferences,
+        headcount_override=plan.headcount_override,
+    )
+    return CateringState(plan=computed_plan, summary=summary)
+
+
+def optimize_catering(event_id: str, goal: str, owner_id: Optional[str]):
+    from app.services import menu_ai
+
+    event = Event.model_validate(get_event(event_id, owner_id))
+    gsummary = guest_summary(event_id, owner_id)
+    budget = _catering_budget_paise(event_id)
+    if budget is None:
+        raise InvalidProposal(
+            "No catering budget allocation found. Generate an event plan first."
+        )
+    plan = _load_catering_plan(event_id)
+    return menu_ai.optimize_for_budget(
+        plan, event.guest_count, gsummary, budget, goal
+    )

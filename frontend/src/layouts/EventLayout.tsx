@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useParams } from "react-router-dom";
 import {
   CalendarClock,
+  ChefHat,
   LayoutDashboard,
   ListChecks,
   Menu,
@@ -46,6 +47,11 @@ function groups(eventId: string): NavGroup[] {
           to: `${base}/budget`,
           label: "Budget & Expenses",
           icon: <Receipt className="h-4 w-4" />,
+        },
+        {
+          to: `${base}/catering`,
+          label: "Catering & Menu",
+          icon: <ChefHat className="h-4 w-4" />,
         },
         {
           to: `${base}/timeline`,

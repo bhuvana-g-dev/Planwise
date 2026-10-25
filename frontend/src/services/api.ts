@@ -1,7 +1,12 @@
 import type {
+  CateringOptimizeResult,
+  CateringPlan,
+  CateringPreferences,
+  CateringState,
   EventCreate,
   EventDetail,
   EventRecord,
+  GenerateMenuResult,
   Guest,
   GuestSummary,
   Plan,
@@ -115,4 +120,25 @@ export const api = {
       `/api/events/${id}/guests`,
       { method: "PUT", body: JSON.stringify({ guests }) }
     ),
+
+  getCatering: (id: string) =>
+    request<CateringState>(`/api/events/${id}/catering`),
+
+  saveCatering: (id: string, plan: CateringPlan) =>
+    request<CateringState>(`/api/events/${id}/catering`, {
+      method: "PUT",
+      body: JSON.stringify(plan),
+    }),
+
+  generateCatering: (id: string, preferences: CateringPreferences) =>
+    request<GenerateMenuResult>(`/api/events/${id}/catering/generate`, {
+      method: "POST",
+      body: JSON.stringify({ preferences }),
+    }),
+
+  optimizeCatering: (id: string, goal: string) =>
+    request<CateringOptimizeResult>(`/api/events/${id}/catering/optimize`, {
+      method: "POST",
+      body: JSON.stringify({ goal }),
+    }),
 };

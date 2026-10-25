@@ -133,3 +133,14 @@ class FirestoreRepository(Repository):
         self.db.collection("events").document(event_id) \
             .collection("meta").document("guests").set({"guests": guests})
         return guests
+
+    # ---- catering ----
+    def get_catering(self, event_id: str) -> Optional[dict]:
+        doc = self.db.collection("events").document(event_id) \
+            .collection("meta").document("catering").get()
+        return doc.to_dict().get("plan") if doc.exists else None
+
+    def save_catering(self, event_id: str, plan: dict) -> dict:
+        self.db.collection("events").document(event_id) \
+            .collection("meta").document("catering").set({"plan": plan})
+        return plan

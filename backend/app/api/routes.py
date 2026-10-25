@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import get_current_owner
+from app.models.catering import CateringPlan, CateringPreferences
 from app.models.change import ReplanRequest
 from app.models.event import EventCreate
 from app.models.guest import GuestCreate
@@ -182,5 +183,55 @@ def save_guests(event_id: str, payload: GuestListPayload,
                 owner=Depends(get_current_owner)):
     try:
         return event_service.save_guests(event_id, list(payload.guests), owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+# --------------------------------------------------------------------------
+# Catering & menu
+# --------------------------------------------------------------------------
+class GenerateMenuPayload(BaseModel):
+    preferences: CateringPreferences = CateringPreferences()
+
+
+class OptimizePayload(BaseModel):
+    goal: str = Field(default="lower_cost")
+
+
+@router.get("/events/{event_id}/catering")
+def get_catering(event_id: str, owner=Depends(get_current_owner)):
+    try:
+        return event_service.get_catering(event_id, owner).model_dump(mode="json")
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.put("/events/{event_id}/catering")
+def save_catering(event_id: str, plan: CateringPlan,
+                  owner=Depends(get_current_owner)):
+    try:
+        return event_service.save_catering(event_id, plan, owner).model_dump(
+            mode="json"
+        )
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.post("/events/{event_id}/catering/generate")
+def generate_catering(event_id: str, payload: GenerateMenuPayload,
+                      owner=Depends(get_current_owner)):
+    try:
+        return event_service.generate_catering_menu(
+            event_id, payload.preferences, owner
+        )
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.post("/events/{event_id}/catering/optimize")
+def optimize_catering(event_id: str, payload: OptimizePayload,
+                      owner=Depends(get_current_owner)):
+    try:
+        return event_service.optimize_catering(event_id, payload.goal, owner)
     except Exception as exc:
         _handle(exc)

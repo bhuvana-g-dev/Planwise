@@ -151,7 +151,7 @@ service-account JSON **is** a secret and is git-ignored.
 
 ## Testing
 
-### Backend (38 tests — 18 required scenarios + auth + concurrency + guests)
+### Backend (58 tests — 18 required scenarios + auth + concurrency + guests + catering)
 
 ```powershell
 cd backend
@@ -168,7 +168,7 @@ cd backend
 This reproduces the demo: create → plan → reduce ₹30,000 → ₹24,000 → approve →
 stale-approval blocked (409) → reload shows v2 persisted.
 
-### Frontend (11 tests)
+### Frontend (13 tests)
 
 ```powershell
 cd frontend
@@ -211,6 +211,10 @@ suite.
 |---|---|---|
 | GET | `/api/events/{id}/guests` | List guests + deterministic RSVP summary |
 | PUT | `/api/events/{id}/guests` | Replace guest list (ids assigned, summary recomputed) |
+| GET | `/api/events/{id}/catering` | Catering plan + deterministic cost summary |
+| PUT | `/api/events/{id}/catering` | Save menu (ids assigned, quantities/totals recomputed) |
+| POST | `/api/events/{id}/catering/generate` | Gemini menu generation (fallback when unavailable) |
+| POST | `/api/events/{id}/catering/optimize` | Budget-fitting menu proposal (not applied until approved) |
 | POST | `/api/events` | Create an event |
 | GET | `/api/events` | List events |
 | GET | `/api/events/{id}` | Event + active plan + versions + vendors |

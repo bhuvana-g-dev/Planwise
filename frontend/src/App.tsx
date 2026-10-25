@@ -10,6 +10,7 @@ import Timeline from "./pages/Timeline";
 import AdaptPlan from "./pages/AdaptPlan";
 import Vendors from "./pages/Vendors";
 import Guests from "./pages/Guests";
+import Catering from "./pages/Catering";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="adapt" element={<AdaptPlan />} />
           <Route path="vendors" element={<Vendors />} />
           <Route path="guests" element={<Guests />} />
+          <Route path="catering" element={<Catering />} />
         </Route>
         <Route path="*" element={<Landing />} />
       </Route>
