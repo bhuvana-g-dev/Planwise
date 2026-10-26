@@ -14,6 +14,16 @@ from app.services import venue_service
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def _demo_mode(monkeypatch):
+    """Keep existing search/filter/sort tests deterministic and offline by
+    forcing the demo catalogue. OSM behaviour is covered separately with the
+    network mocked."""
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "venue_source", "demo")
+    yield
+
+
 def _event(**ov):
     base = {
         "name": "Venue Wedding",
@@ -170,3 +180,108 @@ def test_recommend_fallback_without_gemini(monkeypatch):
     assert body["generated_by"] == "deterministic"
     assert len(body["recommendations"]) > 0
     assert "not verified" in body["disclaimer"].lower()
+
+
+# --------------------------------------------------------------------------
+# OpenStreetMap (real data) — network mocked, deterministic
+# --------------------------------------------------------------------------
+_FAKE_OVERPASS = {
+    "elements": [
+        {"type": "node", "id": 1, "lat": 9.93, "lon": 78.12,
+         "tags": {"name": "Meenakshi Banquet Hall", "amenity": "events_venue",
+                  "addr:city": "Madurai", "contact:phone": "+91-000"}},
+        {"type": "way", "id": 2, "center": {"lat": 9.94, "lon": 78.13},
+         "tags": {"name": "City Community Centre",
+                  "amenity": "community_centre", "wheelchair": "yes"}},
+        {"type": "node", "id": 3, "lat": 9.95, "lon": 78.14,
+         "tags": {"tourism": "hotel", "name": "Grand Hotel",
+                  "internet_access": "wlan"}},
+        {"type": "node", "id": 4, "lat": 9.96, "lon": 78.15,
+         "tags": {"amenity": "events_venue"}},  # no name -> skipped
+    ]
+}
+
+
+def _patch_osm(monkeypatch, elements=None, fail=False):
+    import app.services.osm_venues as osm
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "venue_source", "osm")
+    # clear cache between tests
+    import app.services.venue_service as vs
+    vs._OSM_CACHE.clear()
+
+    if fail:
+        def _boom(city):
+            raise osm.OsmUnavailable("mocked outage")
+        monkeypatch.setattr(vs, "_osm_for_city", _boom)
+        return
+
+    monkeypatch.setattr(osm, "_geocode_city",
+                        lambda city: (9.9, 78.1, 10.0, 78.2))
+
+    class _Resp:
+        def raise_for_status(self): ...
+        def json(self): return elements or _FAKE_OVERPASS
+
+    monkeypatch.setattr(osm.httpx, "post", lambda *a, **k: _Resp())
+
+
+def test_osm_search_returns_real_mapped_venues(monkeypatch):
+    _patch_osm(monkeypatch)
+    page = venue_service.search(VenueQuery(city="Madurai", page_size=50))
+    assert page.source_mode == "osm"
+    assert "openstreetmap" in page.disclaimer.lower()
+    names = {v.name for v in page.results}
+    assert "Meenakshi Banquet Hall" in names
+    assert "Grand Hotel" in names
+    # Unnamed element skipped.
+    assert len(page.results) == 3
+    # OSM venues carry no invented price/capacity.
+    for v in page.results:
+        assert v.source.value == "osm"
+        assert v.est_price_paise is None
+        assert v.capacity == 0
+
+
+def test_osm_classification_and_amenities(monkeypatch):
+    _patch_osm(monkeypatch)
+    page = venue_service.search(VenueQuery(city="Madurai", page_size=50))
+    by_name = {v.name: v for v in page.results}
+    assert by_name["City Community Centre"].venue_type == VenueType.community_hall
+    assert "wheelchair" in by_name["City Community Centre"].amenities
+    assert by_name["Grand Hotel"].venue_type == VenueType.hotel
+    assert "wifi" in by_name["Grand Hotel"].amenities
+
+
+def test_osm_unavailable_falls_back_to_demo(monkeypatch):
+    _patch_osm(monkeypatch, fail=True)
+    page = venue_service.search(VenueQuery(city="Madurai", page_size=50))
+    assert page.source_mode == "demo_fallback"
+    assert all(v.source.value == "demo" for v in page.results)
+    assert "unavailable" in page.disclaimer.lower()
+
+
+def test_osm_no_city_shows_demo_prompt(monkeypatch):
+    from app.core.config import get_settings
+    monkeypatch.setattr(get_settings(), "venue_source", "osm")
+    page = venue_service.search(VenueQuery(page_size=50))  # no city
+    assert page.source_mode == "demo"
+    assert "enter a city" in page.disclaimer.lower()
+
+
+def test_osm_venue_selectable_after_search(monkeypatch):
+    _patch_osm(monkeypatch)
+    ev = client.post("/api/events", json=_event()).json()
+    client.post(f"/api/events/{ev['id']}/plans")
+    # populate the OSM cache via a search
+    page = venue_service.search(VenueQuery(city="Madurai"))
+    osm_venue = next(v for v in page.results if v.source.value == "osm")
+    # shortlist then select the real OSM venue
+    client.post(f"/api/events/{ev['id']}/venues/shortlist",
+                json={"venue": osm_venue.model_dump(mode="json")})
+    sel = client.post(f"/api/events/{ev['id']}/venues/select",
+                      json={"venue_id": osm_venue.id})
+    assert sel.status_code == 200
+    assert sel.json()["venue"]["source"] == "osm"
+    # OSM venue has no price -> budget comparison fields are None
+    assert sel.json()["est_price_paise"] is None

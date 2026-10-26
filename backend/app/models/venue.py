@@ -25,7 +25,8 @@ class VenueType(str, Enum):
 class VenueSource(str, Enum):
     demo = "demo"            # illustrative sample data, NOT a real business
     user = "user"           # user-entered venue
-    provider = "provider"   # verified data from a configured provider
+    osm = "osm"             # real OpenStreetMap data (name/coords/address real)
+    provider = "provider"   # verified data from another configured provider
 
 
 class Venue(BaseModel):

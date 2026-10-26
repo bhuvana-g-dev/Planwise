@@ -9,8 +9,10 @@ the map; they are NOT real venue addresses and are labelled as demo.
 """
 from __future__ import annotations
 
+import time
 import uuid
 
+from app.core.config import get_settings
 from app.core.money import rupees_to_paise
 from app.models.venue import (
     Venue,
@@ -25,6 +27,11 @@ DEMO_DISCLAIMER = (
     "Prices and coordinates are approximate samples. Verify everything "
     "directly with the venue."
 )
+
+# Simple time-based cache of OSM results per city (avoids hammering Overpass
+# on pagination / repeated searches). key -> (expires_at, venues).
+_OSM_CACHE: dict[str, tuple[float, list[Venue]]] = {}
+_OSM_TTL_SECONDS = 600.0
 
 # Approximate city-centre coordinates (public knowledge) used only to place
 # demo markers. Not real venue addresses.
@@ -83,6 +90,51 @@ def _demo_catalogue() -> list[Venue]:
     return venues
 
 
+def _osm_for_city(city: str) -> list[Venue]:
+    """Fetch OSM venues for a city, cached. Raises on failure."""
+    from app.services import osm_venues
+
+    key = city.strip().lower()
+    now = time.time()
+    hit = _OSM_CACHE.get(key)
+    if hit and hit[0] > now:
+        return hit[1]
+    venues = osm_venues.fetch_city_venues(city)
+    _OSM_CACHE[key] = (now + _OSM_TTL_SECONDS, venues)
+    return venues
+
+
+def _resolve_catalogue(query: VenueQuery) -> tuple[list[Venue], str, str]:
+    """Return (catalogue, source_mode, disclaimer).
+
+    When venue_source == 'osm' and a city is provided, fetch REAL venues from
+    OpenStreetMap. Fall back to the demo catalogue if OSM is unavailable or no
+    city is given, clearly labelling the mode.
+    """
+    settings = get_settings()
+    if settings.venue_source.lower() == "osm" and query.city.strip():
+        try:
+            from app.services.osm_venues import OSM_ATTRIBUTION
+            venues = _osm_for_city(query.city)
+            return venues, "osm", OSM_ATTRIBUTION
+        except Exception:
+            # OSM unreachable / no results -> fall back to demo, labelled.
+            return (
+                _demo_catalogue(),
+                "demo_fallback",
+                "Live OpenStreetMap data was unavailable, so sample demo "
+                "venues are shown. " + DEMO_DISCLAIMER,
+            )
+    # No city, or demo mode configured.
+    note = (
+        "Enter a city to search real OpenStreetMap venues. Showing demo "
+        "samples. " + DEMO_DISCLAIMER
+        if settings.venue_source.lower() == "osm"
+        else DEMO_DISCLAIMER
+    )
+    return _demo_catalogue(), "demo", note
+
+
 def _matches(v: Venue, q: VenueQuery) -> bool:
     if q.keyword:
         kw = q.keyword.lower()
@@ -93,7 +145,8 @@ def _matches(v: Venue, q: VenueQuery) -> bool:
         return False
     if q.city and q.city.lower() not in v.city.lower():
         return False
-    if q.min_capacity is not None and v.capacity < q.min_capacity:
+    # capacity 0 = unknown (common for OSM); don't exclude on min_capacity.
+    if q.min_capacity is not None and v.capacity and v.capacity < q.min_capacity:
         return False
     if q.max_price_inr is not None and v.est_price_paise is not None:
         if v.est_price_paise > rupees_to_paise(q.max_price_inr):
@@ -119,8 +172,9 @@ def _sort(venues: list[Venue], sort: str) -> list[Venue]:
 
 
 def search(query: VenueQuery, extra: list[Venue] | None = None) -> VenuePage:
-    """Search demo + user-provided venues with filter/sort/pagination."""
-    catalogue = _demo_catalogue() + list(extra or [])
+    """Search real (OSM) + user-provided venues with filter/sort/pagination."""
+    catalogue, source_mode, disclaimer = _resolve_catalogue(query)
+    catalogue = catalogue + list(extra or [])
     filtered = [v for v in catalogue if _matches(v, query)]
     filtered = _sort(filtered, query.sort)
 
@@ -136,13 +190,24 @@ def search(query: VenueQuery, extra: list[Venue] | None = None) -> VenuePage:
         page=query.page,
         page_size=query.page_size,
         total_pages=total_pages,
-        source_mode="demo",
-        disclaimer=DEMO_DISCLAIMER,
+        source_mode=source_mode,
+        disclaimer=disclaimer,
     )
 
 
 def get_venue(venue_id: str, extra: list[Venue] | None = None) -> Venue | None:
-    for v in _demo_catalogue() + list(extra or []):
+    """Resolve a venue by id across user-provided, cached OSM, and demo sets."""
+    # 1) user/explicit extras (e.g. shortlist)
+    for v in list(extra or []):
+        if v.id == venue_id:
+            return v
+    # 2) cached OSM results (already fetched during a prior search)
+    for _, cached in _OSM_CACHE.values():
+        for v in cached:
+            if v.id == venue_id:
+                return v
+    # 3) demo catalogue
+    for v in _demo_catalogue():
         if v.id == venue_id:
             return v
     return None
@@ -174,15 +239,16 @@ def recommend(event_type: str, city: str, guest_count: int,
     Deterministic ranking: capacity >= guests, within budget, amenity match,
     indoor/outdoor preference. Gemini only adds narrative reasoning.
     """
-    q = VenueQuery(city=city, min_capacity=guest_count,
-                   amenities=required_amenities, page_size=50)
-    candidates = search(q).results
+    page = search(VenueQuery(city=city, amenities=required_amenities,
+                             page_size=50))
+    candidates = page.results
     if not candidates:
-        # relax capacity if nothing fits
-        candidates = search(VenueQuery(city=city, page_size=50)).results
+        page = search(VenueQuery(city=city, page_size=50))
+        candidates = page.results
 
     def score(v: Venue) -> tuple:
-        fits_cap = v.capacity >= guest_count
+        # capacity 0 means "unknown" (common in OSM) — don't penalise as "small".
+        fits_cap = v.capacity == 0 or v.capacity >= guest_count
         within = (venue_budget_paise is None or v.est_price_paise is None
                   or v.est_price_paise <= venue_budget_paise)
         amen = len(set(a.lower() for a in required_amenities)
@@ -205,7 +271,8 @@ def recommend(event_type: str, city: str, guest_count: int,
         "generated_by": reasoning["generated_by"],
         "recommendations": [v.model_dump(mode="json") for v in ranked],
         "reasoning": reasoning["text"],
-        "disclaimer": DEMO_DISCLAIMER,
+        "disclaimer": page.disclaimer,
+        "source_mode": page.source_mode,
     }
 
 
@@ -214,17 +281,18 @@ def _ai_reasoning(event_type, city, guests, budget, indoor_pref,
     from app.services import gemini_client
     from app.services.gemini_client import GeminiError
 
-    names = ", ".join(v.name for v in ranked) or "no suitable demo venues"
+    names = ", ".join(v.name for v in ranked) or "no suitable venues found"
     try:
         system = (
             "You are a venue advisor. Return STRICT JSON {\"text\": string}. "
-            "Explain briefly why the shortlisted venues suit the event. These "
-            "are demo venues — do not claim they are real or verified."
+            "Explain briefly why the shortlisted venues suit the event. Do not "
+            "claim prices, capacity, or availability you were not given."
         )
         prompt = (
             f"Event: {event_type}, city {city}, {guests} guests, indoor pref "
-            f"{indoor_pref}, required amenities {amenities}. Shortlisted demo "
-            f"venues: {names}. Give 2-3 sentences of practical reasoning."
+            f"{indoor_pref}, required amenities {amenities}. Shortlisted "
+            f"venues: {names}. Give 2-3 sentences of practical reasoning, and "
+            "remind the user to confirm capacity, price and availability."
         )
         data = gemini_client.generate_json(prompt, system=system)
         if isinstance(data, dict) and isinstance(data.get("text"), str):
@@ -232,11 +300,12 @@ def _ai_reasoning(event_type, city, guests, budget, indoor_pref,
     except GeminiError:
         pass
     # Deterministic fallback reasoning.
-    fit = [v.name for v in ranked if v.capacity >= guests]
+    fit = [v.name for v in ranked if v.capacity and v.capacity >= guests]
     text = (
-        f"Shortlisted {len(ranked)} demo venue(s) in {city} for ~{guests} guests"
-        + (f"; {', '.join(fit)} meet the capacity requirement" if fit else "")
-        + ". Compare price against your venue budget and verify details with "
-        "each venue directly."
+        f"Shortlisted {len(ranked)} venue(s) in {city} for ~{guests} guests"
+        + (f"; {', '.join(fit)} list enough capacity" if fit else
+           "; capacity is not listed for these, so confirm it with each venue")
+        + ". Prices are usually not in the source data — confirm cost and "
+        "availability directly with each venue."
     )
     return {"generated_by": "deterministic", "text": text}

@@ -127,18 +127,24 @@ Enabling Gemini, Firestore or Auth requires **no code changes** — just set the
 - **Map provider:** Leaflet + OpenStreetMap tiles — **no API key required**, so
   the map works with zero configuration. Tiles load from the public OSM tile
   server with proper attribution.
-- **Venue data:** no external venue-search API is configured, so the catalogue
-  is clearly-labelled **demo data** (`source: "demo"`, disclaimer shown in the
-  UI and every API response). Demo venues are illustrative only — never
-  presented as verified real businesses. Prices and coordinates are approximate
-  samples; coordinates are approximate city centres used only to place markers.
+- **Venue data (real, default):** `VENUE_SOURCE=osm` fetches **real venues from
+  OpenStreetMap** via the Overpass API — real names, coordinates and addresses
+  that exist in OSM (`source: "osm"`). No API key or cost. Data is
+  © OpenStreetMap contributors (ODbL); the UI shows attribution. OSM rarely
+  carries prices or capacity, so those stay **empty/unknown** — PlanWise never
+  invents them. Enter a **city** to search; results are cached ~10 min to avoid
+  hammering Overpass. Several Overpass mirrors are tried for resilience.
+- **Graceful fallback:** if Overpass is unreachable (or no city is entered), the
+  app shows clearly-labelled **demo** samples (`source_mode: "demo_fallback"` /
+  `"demo"`) with an explicit disclaimer, so it stays usable. Set
+  `VENUE_SOURCE=demo` to force sample mode.
 - **Manual entry:** users can add their own venues (`source: "user"`), including
-  coordinates, which plot on the map alongside demo venues.
-- **Swapping in a real provider:** replace `venue_service._demo_catalogue()`
-  with a provider call (e.g. Google Places / a venue API). The `/api/venues/*`
-  response shapes are stable, so the frontend needs no changes. If you add a
-  provider key, keep it **backend-only** (never in the Vite bundle) and document
-  it as a backend env var.
+  coordinates and a real price/capacity, which plot on the map alongside search
+  results.
+- **Richer provider (optional):** to use Google Places etc., add a provider call
+  in `osm_venues` / `venue_service`. The `/api/venues/*` response shapes are
+  stable, so the frontend needs no changes. Keep any provider key **backend-only**
+  (never in the Vite bundle).
 - **Venue → event:** selecting a venue records it on the event and compares its
   estimated cost against the plan's `venue` budget allocation. It does **not**
   overwrite or regenerate the event plan; when over budget it links to Adapt

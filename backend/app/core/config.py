@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Persistence: "json" or "firestore"
     persistence: str = "json"
 
+    # Venue data source: "osm" (real OpenStreetMap data) or "demo" (samples).
+    venue_source: str = "osm"
+
     # Firestore
     firebase_project_id: str = ""
     google_application_credentials: str = ""
