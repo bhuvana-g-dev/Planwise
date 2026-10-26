@@ -15,6 +15,7 @@ from app.core.money import rupees_to_paise
 from app.models.change import ReplanRequest, ReplanResult
 from app.models.event import Event, EventCreate
 from app.models.plan import Plan, VendorQuote
+from app.models.venue import Venue
 from app.repositories.base import StaleActivePlan
 from app.repositories.provider import get_repository
 from app.services import budget_service, change_engine, plan_generator, vendor_service
@@ -354,4 +355,109 @@ def optimize_catering(event_id: str, goal: str, owner_id: Optional[str]):
     plan = _load_catering_plan(event_id)
     return menu_ai.optimize_for_budget(
         plan, event.guest_count, gsummary, budget, goal
+    )
+
+
+# --------------------------------------------------------------------------
+# Venues
+# --------------------------------------------------------------------------
+def _venue_budget_paise(event_id: str) -> Optional[int]:
+    """Authoritative venue allocation = active plan's 'venue' category."""
+    active = get_repository().get_active_plan(event_id)
+    if not active:
+        return None
+    return active.get("budget", {}).get("category_totals", {}).get("venue")
+
+
+def search_venues(query):
+    """Public demo venue search (no event scope, no ownership needed)."""
+    from app.services import venue_service
+    return venue_service.search(query)
+
+
+def get_venue_detail(venue_id: str, event_id: Optional[str],
+                     owner_id: Optional[str]):
+    from app.services import venue_service
+    extra = []
+    if event_id:
+        get_event(event_id, owner_id)
+        extra = [Venue.model_validate(v)
+                 for v in get_repository().list_shortlisted_venues(event_id)]
+    v = venue_service.get_venue(venue_id, extra)
+    if v is None:
+        raise NotFound(venue_id)
+    return v
+
+
+def list_shortlist(event_id: str, owner_id: Optional[str]) -> list[dict]:
+    get_event(event_id, owner_id)
+    return get_repository().list_shortlisted_venues(event_id)
+
+
+def shortlist_venue(event_id: str, venue, owner_id: Optional[str]):
+    """Add a venue (demo or user-entered) to the event's shortlist."""
+    from app.models.venue import Venue as VenueModel
+    get_event(event_id, owner_id)
+    current = get_repository().list_shortlisted_venues(event_id)
+    vdict = venue.model_dump(mode="json") if hasattr(venue, "model_dump") else venue
+    # de-dup by id
+    current = [c for c in current if c.get("id") != vdict["id"]]
+    current.append(vdict)
+    get_repository().save_shortlisted_venues(event_id, current)
+    return current
+
+
+def remove_shortlist(event_id: str, venue_id: str, owner_id: Optional[str]):
+    get_event(event_id, owner_id)
+    current = get_repository().list_shortlisted_venues(event_id)
+    current = [c for c in current if c.get("id") != venue_id]
+    get_repository().save_shortlisted_venues(event_id, current)
+    return current
+
+
+def select_venue(event_id: str, venue_id: str, owner_id: Optional[str]):
+    """Associate a venue with the event and return a budget comparison.
+
+    Does NOT regenerate or overwrite the event plan; only records the choice
+    and reports the venue cost against the plan's venue allocation.
+    """
+    from app.models.venue import SelectedVenue
+    from app.services import venue_service
+
+    get_event(event_id, owner_id)
+    shortlist = [Venue.model_validate(v)
+                 for v in get_repository().list_shortlisted_venues(event_id)]
+    venue = venue_service.get_venue(venue_id, shortlist)
+    if venue is None:
+        raise NotFound(venue_id)
+
+    repo = get_repository()
+    repo.update_event(event_id, {
+        "selected_venue_id": venue.id,
+        "selected_venue": venue.model_dump(mode="json"),
+        "updated_at": _now().isoformat(),
+    })
+
+    venue_budget = _venue_budget_paise(event_id)
+    price = venue.est_price_paise
+    remaining = overrun = within = None
+    if venue_budget is not None and price is not None:
+        remaining = venue_budget - price
+        overrun = max(0, price - venue_budget)
+        within = price <= venue_budget
+
+    return SelectedVenue(
+        venue=venue, est_price_paise=price, venue_budget_paise=venue_budget,
+        remaining_paise=remaining, overrun_paise=overrun, within_budget=within,
+    )
+
+
+def recommend_venues(event_id: str, indoor_pref: str,
+                     required_amenities: list, owner_id: Optional[str]):
+    from app.services import venue_service
+    event = Event.model_validate(get_event(event_id, owner_id))
+    venue_budget = _venue_budget_paise(event_id)
+    return venue_service.recommend(
+        event.event_type.value, event.location.split(",")[0].strip(),
+        event.guest_count, venue_budget, indoor_pref, list(required_amenities),
     )

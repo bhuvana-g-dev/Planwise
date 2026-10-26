@@ -122,6 +122,28 @@ Enabling Gemini, Firestore or Auth requires **no code changes** — just set the
 
 ---
 
+## Venue discovery & maps
+
+- **Map provider:** Leaflet + OpenStreetMap tiles — **no API key required**, so
+  the map works with zero configuration. Tiles load from the public OSM tile
+  server with proper attribution.
+- **Venue data:** no external venue-search API is configured, so the catalogue
+  is clearly-labelled **demo data** (`source: "demo"`, disclaimer shown in the
+  UI and every API response). Demo venues are illustrative only — never
+  presented as verified real businesses. Prices and coordinates are approximate
+  samples; coordinates are approximate city centres used only to place markers.
+- **Manual entry:** users can add their own venues (`source: "user"`), including
+  coordinates, which plot on the map alongside demo venues.
+- **Swapping in a real provider:** replace `venue_service._demo_catalogue()`
+  with a provider call (e.g. Google Places / a venue API). The `/api/venues/*`
+  response shapes are stable, so the frontend needs no changes. If you add a
+  provider key, keep it **backend-only** (never in the Vite bundle) and document
+  it as a backend env var.
+- **Venue → event:** selecting a venue records it on the event and compares its
+  estimated cost against the plan's `venue` budget allocation. It does **not**
+  overwrite or regenerate the event plan; when over budget it links to Adapt
+  Plan so the existing change-impact engine can rebalance.
+
 ## Authentication (optional Firebase Auth)
 
 Auth is **fully implemented and off by default** so the app runs with zero
@@ -151,7 +173,7 @@ service-account JSON **is** a secret and is git-ignored.
 
 ## Testing
 
-### Backend (58 tests — 18 required scenarios + auth + concurrency + guests + catering)
+### Backend (73 tests — 18 required scenarios + auth + concurrency + guests + catering + venues)
 
 ```powershell
 cd backend
@@ -168,7 +190,7 @@ cd backend
 This reproduces the demo: create → plan → reduce ₹30,000 → ₹24,000 → approve →
 stale-approval blocked (409) → reload shows v2 persisted.
 
-### Frontend (13 tests)
+### Frontend (15 tests)
 
 ```powershell
 cd frontend
@@ -215,6 +237,12 @@ suite.
 | PUT | `/api/events/{id}/catering` | Save menu (ids assigned, quantities/totals recomputed) |
 | POST | `/api/events/{id}/catering/generate` | Gemini menu generation (fallback when unavailable) |
 | POST | `/api/events/{id}/catering/optimize` | Budget-fitting menu proposal (not applied until approved) |
+| POST | `/api/venues/search` | Public venue search (filter/sort/paginate, demo data) |
+| GET | `/api/venues/{venue_id}` | Venue detail |
+| GET/POST/DELETE | `/api/events/{id}/venues/shortlist` | Per-event venue shortlist |
+| POST | `/api/events/{id}/venues/manual` | Add a user-entered venue |
+| POST | `/api/events/{id}/venues/select` | Select a venue + budget comparison (no plan overwrite) |
+| POST | `/api/events/{id}/venues/recommend` | AI venue suggestions (deterministic fallback) |
 | POST | `/api/events` | Create an event |
 | GET | `/api/events` | List events |
 | GET | `/api/events/{id}` | Event + active plan + versions + vendors |

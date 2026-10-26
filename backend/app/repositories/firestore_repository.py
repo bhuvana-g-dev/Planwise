@@ -144,3 +144,15 @@ class FirestoreRepository(Repository):
         self.db.collection("events").document(event_id) \
             .collection("meta").document("catering").set({"plan": plan})
         return plan
+
+    # ---- venues ----
+    def list_shortlisted_venues(self, event_id: str) -> list[dict]:
+        doc = self.db.collection("events").document(event_id) \
+            .collection("meta").document("venues").get()
+        return doc.to_dict().get("venues", []) if doc.exists else []
+
+    def save_shortlisted_venues(self, event_id: str,
+                                venues: list[dict]) -> list[dict]:
+        self.db.collection("events").document(event_id) \
+            .collection("meta").document("venues").set({"venues": venues})
+        return venues

@@ -11,6 +11,7 @@ import AdaptPlan from "./pages/AdaptPlan";
 import Vendors from "./pages/Vendors";
 import Guests from "./pages/Guests";
 import Catering from "./pages/Catering";
+import VenueDiscovery from "./pages/VenueDiscovery";
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="vendors" element={<Vendors />} />
           <Route path="guests" element={<Guests />} />
           <Route path="catering" element={<Catering />} />
+          <Route path="venues-discovery" element={<VenueDiscovery />} />
         </Route>
         <Route path="*" element={<Landing />} />
       </Route>

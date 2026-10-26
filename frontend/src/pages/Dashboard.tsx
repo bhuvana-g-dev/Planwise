@@ -86,11 +86,47 @@ export default function Dashboard() {
           <Link to={`/events/${eventId}/guests`} className="btn-secondary">
             <Users className="h-4 w-4" /> Guests
           </Link>
+          <Link
+            to={`/events/${eventId}/venues-discovery`}
+            className="btn-secondary"
+          >
+            <MapPin className="h-4 w-4" /> Venues
+          </Link>
           <Link to={`/events/${eventId}/vendors`} className="btn-secondary">
             Vendors
           </Link>
         </div>
       </div>
+
+      {data.selected_venue && (
+        <div className="card p-5">
+          <h3 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
+            <MapPin className="h-5 w-5 text-brand-600" /> Selected venue
+          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-medium text-slate-900">
+                {data.selected_venue.name}
+              </p>
+              <p className="text-sm text-slate-500">
+                {data.selected_venue.location} · capacity{" "}
+                {data.selected_venue.capacity}
+              </p>
+            </div>
+            <Link
+              to={`/events/${eventId}/venues-discovery`}
+              className="text-sm font-medium text-brand-600 hover:underline"
+            >
+              Change venue →
+            </Link>
+          </div>
+          {data.selected_venue.source === "demo" && (
+            <p className="mt-2 text-xs text-amber-600">
+              Demo venue — verify details independently before booking.
+            </p>
+          )}
+        </div>
+      )}
 
       {data.guest_summary && data.guest_summary.total_guests > 0 && (
         <div className="card p-5">

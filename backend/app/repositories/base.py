@@ -82,3 +82,11 @@ class Repository(ABC):
 
     @abstractmethod
     def save_catering(self, event_id: str, plan: dict) -> dict: ...
+
+    # --- venues (per-event shortlist + selection) ---
+    @abstractmethod
+    def list_shortlisted_venues(self, event_id: str) -> list[dict]: ...
+
+    @abstractmethod
+    def save_shortlisted_venues(self, event_id: str,
+                                venues: list[dict]) -> list[dict]: ...

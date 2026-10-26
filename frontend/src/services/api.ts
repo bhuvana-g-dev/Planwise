@@ -12,7 +12,12 @@ import type {
   Plan,
   ReplanRequest,
   ReplanResult,
+  SelectedVenue,
   Task,
+  Venue,
+  VenuePage,
+  VenueQuery,
+  VenueRecommendation,
   VendorComparison,
   VendorQuote,
 } from "../types";
@@ -140,5 +145,42 @@ export const api = {
     request<CateringOptimizeResult>(`/api/events/${id}/catering/optimize`, {
       method: "POST",
       body: JSON.stringify({ goal }),
+    }),
+
+  // --- venues ---
+  searchVenues: (query: VenueQuery) =>
+    request<VenuePage>(`/api/venues/search`, {
+      method: "POST",
+      body: JSON.stringify(query),
+    }),
+
+  listShortlist: (id: string) =>
+    request<Venue[]>(`/api/events/${id}/venues/shortlist`),
+
+  shortlistVenue: (id: string, venue: Venue) =>
+    request<Venue[]>(`/api/events/${id}/venues/shortlist`, {
+      method: "POST",
+      body: JSON.stringify({ venue }),
+    }),
+
+  removeShortlist: (id: string, venueId: string) =>
+    request<Venue[]>(`/api/events/${id}/venues/shortlist/${venueId}`, {
+      method: "DELETE",
+    }),
+
+  selectVenue: (id: string, venueId: string) =>
+    request<SelectedVenue>(`/api/events/${id}/venues/select`, {
+      method: "POST",
+      body: JSON.stringify({ venue_id: venueId }),
+    }),
+
+  recommendVenues: (
+    id: string,
+    indoor_pref: string,
+    required_amenities: string[]
+  ) =>
+    request<VenueRecommendation>(`/api/events/${id}/venues/recommend`, {
+      method: "POST",
+      body: JSON.stringify({ indoor_pref, required_amenities }),
     }),
 };

@@ -12,6 +12,7 @@ from app.models.change import ReplanRequest
 from app.models.event import EventCreate
 from app.models.guest import GuestCreate
 from app.models.plan import VendorQuote
+from app.models.venue import VenueCreate, VenueQuery
 from app.services import event_service
 from app.services.event_service import (
     Forbidden,
@@ -58,9 +59,12 @@ def get_event(event_id: str, owner=Depends(get_current_owner)):
         vendors = event_service.list_vendors(event_id, owner)
         guests = event_service.list_guests(event_id, owner)
         guest_summary = event_service.guest_summary(event_id, owner)
+        shortlist = event_service.list_shortlist(event_id, owner)
         return {"event": event, "active_plan": active, "plans": plans,
                 "vendors": vendors, "guests": guests,
-                "guest_summary": guest_summary.model_dump(mode="json")}
+                "guest_summary": guest_summary.model_dump(mode="json"),
+                "venue_shortlist": shortlist,
+                "selected_venue": event.get("selected_venue")}
     except Exception as exc:
         _handle(exc)
 
@@ -233,5 +237,99 @@ def optimize_catering(event_id: str, payload: OptimizePayload,
                       owner=Depends(get_current_owner)):
     try:
         return event_service.optimize_catering(event_id, payload.goal, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+# --------------------------------------------------------------------------
+# Venues
+# --------------------------------------------------------------------------
+@router.post("/venues/search")
+def search_venues(query: VenueQuery):
+    # Public demo search — no event scope, no auth needed.
+    return event_service.search_venues(query).model_dump(mode="json")
+
+
+@router.get("/venues/{venue_id}")
+def get_venue(venue_id: str, event_id: Optional[str] = None,
+              owner=Depends(get_current_owner)):
+    try:
+        return event_service.get_venue_detail(
+            venue_id, event_id, owner
+        ).model_dump(mode="json")
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.get("/events/{event_id}/venues/shortlist")
+def list_shortlist(event_id: str, owner=Depends(get_current_owner)):
+    try:
+        return event_service.list_shortlist(event_id, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+class ShortlistPayload(BaseModel):
+    venue: dict  # a Venue dict (demo) or user-entered venue already normalized
+
+
+@router.post("/events/{event_id}/venues/shortlist")
+def add_shortlist(event_id: str, payload: ShortlistPayload,
+                  owner=Depends(get_current_owner)):
+    try:
+        from app.models.venue import Venue as VenueModel
+        venue = VenueModel.model_validate(payload.venue)
+        return event_service.shortlist_venue(event_id, venue, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.post("/events/{event_id}/venues/manual")
+def add_manual_venue(event_id: str, payload: VenueCreate,
+                     owner=Depends(get_current_owner)):
+    try:
+        from app.services import venue_service
+        venue = venue_service.venue_from_create(payload)
+        return event_service.shortlist_venue(event_id, venue, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.delete("/events/{event_id}/venues/shortlist/{venue_id}")
+def remove_shortlist(event_id: str, venue_id: str,
+                     owner=Depends(get_current_owner)):
+    try:
+        return event_service.remove_shortlist(event_id, venue_id, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+class SelectVenuePayload(BaseModel):
+    venue_id: str
+
+
+@router.post("/events/{event_id}/venues/select")
+def select_venue(event_id: str, payload: SelectVenuePayload,
+                 owner=Depends(get_current_owner)):
+    try:
+        return event_service.select_venue(
+            event_id, payload.venue_id, owner
+        ).model_dump(mode="json")
+    except Exception as exc:
+        _handle(exc)
+
+
+class VenueRecommendPayload(BaseModel):
+    indoor_pref: str = "any"
+    required_amenities: list[str] = []
+
+
+@router.post("/events/{event_id}/venues/recommend")
+def recommend_venues(event_id: str, payload: VenueRecommendPayload,
+                     owner=Depends(get_current_owner)):
+    try:
+        return event_service.recommend_venues(
+            event_id, payload.indoor_pref, payload.required_amenities, owner
+        )
     except Exception as exc:
         _handle(exc)

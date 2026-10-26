@@ -180,3 +180,16 @@ class JsonRepository(Repository):
             db.setdefault("catering", {})[event_id] = plan
             self._write(db)
             return plan
+
+    # ---- venues ----
+    def list_shortlisted_venues(self, event_id: str) -> list[dict]:
+        with self._lock:
+            return list(self._read().get("venues", {}).get(event_id, []))
+
+    def save_shortlisted_venues(self, event_id: str,
+                                venues: list[dict]) -> list[dict]:
+        with self._lock:
+            db = self._read()
+            db.setdefault("venues", {})[event_id] = venues
+            self._write(db)
+            return venues

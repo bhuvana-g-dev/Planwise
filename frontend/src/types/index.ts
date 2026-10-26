@@ -210,6 +210,8 @@ export interface EventDetail {
   vendors: VendorQuote[];
   guests: Guest[];
   guest_summary: GuestSummary;
+  venue_shortlist?: Venue[];
+  selected_venue?: Venue | null;
 }
 
 // --- Catering ---
@@ -312,6 +314,76 @@ export interface GenerateMenuResult {
   generated_by: string;
   state: CateringState;
   allergy_notice: string | null;
+}
+
+// --- Venues ---
+export type VenueType =
+  | "wedding_hall"
+  | "banquet_hall"
+  | "hotel"
+  | "outdoor_garden"
+  | "beach"
+  | "community_hall"
+  | "conference_hall"
+  | "other";
+
+export interface Venue {
+  id: string;
+  name: string;
+  venue_type: VenueType;
+  location: string;
+  city: string;
+  est_price_paise: number | null;
+  capacity: number;
+  indoor: boolean;
+  outdoor: boolean;
+  amenities: string[];
+  lat: number | null;
+  lng: number | null;
+  image_url: string;
+  contact: string;
+  source: "demo" | "user" | "provider";
+  notes: string;
+}
+
+export interface VenueQuery {
+  keyword?: string;
+  venue_type?: VenueType | null;
+  city?: string;
+  min_capacity?: number | null;
+  max_price_inr?: number | null;
+  indoor?: boolean | null;
+  outdoor?: boolean | null;
+  amenities?: string[];
+  sort?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface VenuePage {
+  results: Venue[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  source_mode: string;
+  disclaimer: string;
+}
+
+export interface SelectedVenue {
+  venue: Venue;
+  est_price_paise: number | null;
+  venue_budget_paise: number | null;
+  remaining_paise: number | null;
+  overrun_paise: number | null;
+  within_budget: boolean | null;
+}
+
+export interface VenueRecommendation {
+  generated_by: string;
+  recommendations: Venue[];
+  reasoning: string;
+  disclaimer: string;
 }
 
 export interface CateringOptimizeResult {

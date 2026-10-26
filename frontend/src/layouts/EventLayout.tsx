@@ -5,6 +5,7 @@ import {
   ChefHat,
   LayoutDashboard,
   ListChecks,
+  MapPinned,
   Menu,
   Receipt,
   RefreshCw,
@@ -72,6 +73,11 @@ function groups(eventId: string): NavGroup[] {
           to: `${base}/guests`,
           label: "Guests & RSVP",
           icon: <Users className="h-4 w-4" />,
+        },
+        {
+          to: `${base}/venues-discovery`,
+          label: "Venues & Maps",
+          icon: <MapPinned className="h-4 w-4" />,
         },
         {
           to: `${base}/vendors`,
