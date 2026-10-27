@@ -3,8 +3,10 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowRight,
   Check,
+  Loader2,
   Minus,
   Plus,
+  RefreshCw,
   ShieldCheck,
   TriangleAlert,
   X,
@@ -15,9 +17,9 @@ import {
   ConfirmDialog,
   EmptyState,
   ErrorBanner,
-  Spinner,
-  SuccessBanner,
+  Skeleton,
 } from "../components/ui";
+import { useToast } from "../components/Toast";
 import { api, ApiError } from "../services/api";
 import type { ChangeType, ReplanRequest, ReplanResult } from "../types";
 import { formatDate, formatINR, titleCase } from "../utils/format";
@@ -25,6 +27,7 @@ import { formatDate, formatINR, titleCase } from "../utils/format";
 export default function AdaptPlan() {
   const { eventId } = useParams();
   const { data, loading, error, reload } = useEventDetail(eventId);
+  const toast = useToast();
 
   const [changeType, setChangeType] = useState<ChangeType>("budget");
   const [budget, setBudget] = useState<number>(24000);
@@ -33,11 +36,21 @@ export default function AdaptPlan() {
   const [result, setResult] = useState<ReplanResult | null>(null);
   const [running, setRunning] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [approving, setApproving] = useState(false);
 
-  if (loading) return <Spinner label="Loading plan…" />;
+  if (loading)
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-9 w-40" />
+        <Skeleton className="h-32 w-full" />
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+      </div>
+    );
   if (error) return <ErrorBanner message={error} />;
   if (!data) return null;
   const plan = data.active_plan;
@@ -45,8 +58,9 @@ export default function AdaptPlan() {
   if (!plan)
     return (
       <EmptyState
+        icon={<RefreshCw className="h-7 w-7" />}
         title="No active plan to adapt"
-        description="Generate a plan first, then you can change the budget, guests or date."
+        description="Generate a plan first, then you can change the budget, guests or date and preview the impact."
         action={
           <Link to={`/events/${eventId}`} className="btn-primary">
             Back to dashboard
@@ -64,13 +78,17 @@ export default function AdaptPlan() {
 
     setRunning(true);
     setActionError(null);
-    setSuccess(null);
     setResult(null);
     try {
       const res = await api.replan(eventId, req);
       setResult(res);
+      if (!res.report.feasible) {
+        toast.info("No feasible plan found — see the conflict details below.");
+      }
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : "Replan failed");
+      const msg = e instanceof ApiError ? e.message : "Replan failed";
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setRunning(false);
     }
@@ -82,7 +100,7 @@ export default function AdaptPlan() {
     setActionError(null);
     try {
       await api.approvePlan(eventId, result.proposed_plan, plan.version);
-      setSuccess("Revision approved and saved as the new active plan.");
+      toast.success("Revision approved and saved as the new active plan. 🎉");
       setResult(null);
       setConfirmOpen(false);
       await reload();
@@ -94,6 +112,7 @@ export default function AdaptPlan() {
           ? e.message
           : "Approval failed";
       setActionError(msg);
+      toast.error(msg);
       setConfirmOpen(false);
     } finally {
       setApproving(false);
@@ -103,10 +122,15 @@ export default function AdaptPlan() {
   const report = result?.report;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="stagger space-y-6">
+      <div
+        className="flex items-center justify-between"
+        style={{ ["--i" as string]: 0 }}
+      >
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Adapt plan</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+            <RefreshCw className="h-6 w-6 text-brand-600" /> Adapt plan
+          </h1>
           <p className="text-sm text-slate-500">
             Current plan v{plan.version} · {formatINR(plan.budget.budget_paise)}{" "}
             budget
@@ -118,11 +142,10 @@ export default function AdaptPlan() {
       </div>
 
       {actionError && <ErrorBanner message={actionError} />}
-      {success && <SuccessBanner message={success} />}
 
       {/* Change controls */}
-      <div className="card p-6">
-        <div className="mb-4 flex flex-wrap gap-2">
+      <div className="card p-6" style={{ ["--i" as string]: 1 }}>
+        <div className="mb-4 inline-flex gap-1 rounded-xl border border-sand-300 p-1">
           {(
             [
               ["budget", "Budget"],
@@ -135,8 +158,8 @@ export default function AdaptPlan() {
               onClick={() => setChangeType(t)}
               className={
                 changeType === t
-                  ? "rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white"
-                  : "rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  ? "rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm"
+                  : "rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-sand-50"
               }
             >
               {label}
@@ -185,14 +208,20 @@ export default function AdaptPlan() {
             onClick={propose}
             disabled={running || (changeType === "event_date" && !date)}
           >
-            {running ? "Analyzing…" : "Propose changes"}
+            {running ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Analyzing…
+              </>
+            ) : (
+              "Propose changes"
+            )}
           </button>
         </div>
       </div>
 
       {/* Result */}
       {report && (
-        <>
+        <div className="stagger space-y-6" style={{ ["--i" as string]: 2 }}>
           {report.feasible ? (
             <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
               <ShieldCheck className="h-4 w-4" />
@@ -243,7 +272,7 @@ export default function AdaptPlan() {
                     .map((d, i) => (
                       <li
                         key={i}
-                        className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                        className="flex items-center justify-between rounded-lg bg-sand-50 px-3 py-2 text-sm"
                       >
                         <span className="flex items-center gap-2">
                           <DeltaIcon kind={d.kind} />
@@ -284,7 +313,7 @@ export default function AdaptPlan() {
                   {report.task_deltas.map((d, i) => (
                     <li
                       key={i}
-                      className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"
+                      className="flex items-center justify-between rounded-lg bg-sand-50 px-3 py-2"
                     >
                       <span className="font-medium text-slate-700">{d.name}</span>
                       <span className="text-slate-600">
@@ -369,7 +398,7 @@ export default function AdaptPlan() {
               className="btn-danger"
               onClick={() => {
                 setResult(null);
-                setSuccess("Proposal rejected. Your current plan is unchanged.");
+                toast.info("Proposal rejected. Your current plan is unchanged.");
               }}
             >
               <X className="h-4 w-4" /> Reject
@@ -382,7 +411,7 @@ export default function AdaptPlan() {
               <Check className="h-4 w-4" /> Approve revision
             </button>
           </div>
-        </>
+        </div>
       )}
 
       <ConfirmDialog

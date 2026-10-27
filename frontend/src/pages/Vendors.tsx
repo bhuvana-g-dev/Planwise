@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Store, Trash2 } from "lucide-react";
 import { useEventDetail } from "../hooks/useEventDetail";
-import { Badge, ErrorBanner, Spinner } from "../components/ui";
+import { Badge, ErrorBanner, Skeleton } from "../components/ui";
+import { useToast } from "../components/Toast";
 import { api, ApiError } from "../services/api";
 import type { VendorComparison, VendorQuote } from "../types";
 import { titleCase } from "../utils/format";
@@ -24,12 +25,19 @@ function blankQuote(): VendorQuote {
 export default function Vendors() {
   const { eventId } = useParams();
   const { data, loading, error } = useEventDetail(eventId);
+  const toast = useToast();
   const [quotes, setQuotes] = useState<VendorQuote[]>([blankQuote()]);
   const [comparison, setComparison] = useState<VendorComparison | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  if (loading) return <Spinner label="Loading…" />;
+  if (loading)
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-9 w-56" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
   if (error) return <ErrorBanner message={error} />;
   if (!data) return null;
 
@@ -43,7 +51,7 @@ export default function Vendors() {
     if (!eventId) return;
     const valid = quotes.filter((q) => q.vendor_name.trim());
     if (valid.length === 0) {
-      setActionError("Add at least one vendor with a name.");
+      toast.error("Add at least one vendor with a name.");
       return;
     }
     setBusy(true);
@@ -51,23 +59,31 @@ export default function Vendors() {
     try {
       const res = await api.compareVendors(eventId, valid);
       setComparison(res);
+      toast.success(`Compared ${valid.length} quote(s).`);
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : "Comparison failed");
+      const msg = e instanceof ApiError ? e.message : "Comparison failed";
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Vendor quotations</h1>
+    <div className="stagger space-y-6">
+      <div
+        className="flex items-center justify-between"
+        style={{ ["--i" as string]: 0 }}
+      >
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+          <Store className="h-6 w-6 text-brand-600" /> Vendor quotations
+        </h1>
         <Link to={`/events/${eventId}`} className="btn-secondary">
           Back to dashboard
         </Link>
       </div>
 
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-slate-500" style={{ ["--i" as string]: 1 }}>
         Enter real quotes you've collected. PlanWise never invents vendor prices
         or availability — it only compares what you provide.
       </p>
@@ -80,7 +96,7 @@ export default function Vendors() {
         </p>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-4" style={{ ["--i" as string]: 2 }}>
         {quotes.map((q, i) => (
           <div key={i} className="card p-5">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -188,7 +204,7 @@ export default function Vendors() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+              <thead className="bg-sand-100 text-left text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-4 py-2">Vendor</th>
                   <th className="px-4 py-2">Category</th>
@@ -197,7 +213,7 @@ export default function Vendors() {
                   <th className="px-4 py-2">Verified</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-sand-200">
                 {comparison.quotes.map((q) => (
                   <tr key={q.id}>
                     <td className="px-4 py-2 font-medium text-slate-800">
