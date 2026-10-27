@@ -1,30 +1,72 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
+  ArrowRight,
   CalendarDays,
   ClipboardList,
   Lightbulb,
   ListChecks,
   MapPin,
+  PartyPopper,
   RefreshCw,
+  Sparkles,
   Users,
   Wallet,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useEventDetail } from "../hooks/useEventDetail";
-import { Badge, EmptyState, ErrorBanner, Spinner } from "../components/ui";
+import {
+  Badge,
+  EmptyState,
+  ErrorBanner,
+  ProgressRing,
+  Skeleton,
+} from "../components/ui";
 import BudgetSummaryCard from "../components/BudgetSummaryCard";
 import BudgetChart from "../components/BudgetChart";
+import { Countdown } from "../components/Countdown";
+import { Confetti } from "../components/Confetti";
+import MilestoneJourney from "../components/MilestoneJourney";
+import { EventTypeSticker, SparkleSticker } from "../components/Stickers";
+import { useToast } from "../components/Toast";
+import { useAuth } from "../hooks/useAuth";
+import {
+  deriveMilestones,
+  milestoneProgress,
+  nextAction,
+} from "../utils/milestones";
 import { formatDate } from "../utils/format";
 import { api } from "../services/api";
-import { useState } from "react";
+
+function greeting(name?: string | null): string {
+  const h = new Date().getHours();
+  const part = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  return name ? `${part}, ${name.split(" ")[0]}` : part;
+}
 
 export default function Dashboard() {
   const { eventId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const toast = useToast();
   const { data, loading, error, reload } = useEventDetail(eventId);
   const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
+  const [confetti, setConfetti] = useState(0);
+  const prevProgress = useRef<number | null>(null);
 
-  if (loading) return <Spinner label="Loading event…" />;
+  const milestones = data && eventId ? deriveMilestones(data, eventId) : [];
+  const progress = milestoneProgress(milestones);
+  const next = nextAction(milestones);
+
+  // Fire confetti once when progress reaches 100% (a real, data-derived state).
+  useEffect(() => {
+    if (prevProgress.current !== null && prevProgress.current < 100 && progress === 100) {
+      setConfetti((c) => c + 1);
+    }
+    prevProgress.current = progress;
+  }, [progress]);
+
+  if (loading) return <DashboardSkeleton />;
   if (error) return <ErrorBanner message={error} />;
   if (!data) return null;
 
@@ -33,12 +75,12 @@ export default function Dashboard() {
   async function generate() {
     if (!eventId) return;
     setGenerating(true);
-    setGenError(null);
     try {
       await api.generatePlan(eventId);
       await reload();
+      toast.success("Plan generated and saved.");
     } catch (e) {
-      setGenError(e instanceof Error ? e.message : "Failed to generate plan");
+      toast.error(e instanceof Error ? e.message : "Failed to generate plan");
     } finally {
       setGenerating(false);
     }
@@ -53,53 +95,126 @@ export default function Dashboard() {
   const totalTasks = plan?.tasks.length ?? 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">{event.name}</h1>
-            <Badge tone="brand">{event.event_type}</Badge>
+    <div className="stagger space-y-6">
+      <Confetti fire={confetti} />
+
+      {/* ───────── Hero / command center ───────── */}
+      <section
+        className="card relative overflow-hidden p-6 sm:p-8"
+        style={{ ["--i" as string]: 0 }}
+      >
+        <SparkleSticker
+          size={120}
+          className="pointer-events-none absolute -right-6 -top-6 opacity-20"
+        />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm text-slate-500">
+              {greeting(user?.displayName ?? user?.email)}
+            </p>
+            <div className="mt-1 flex items-center gap-3">
+              <EventTypeSticker type={event.event_type} size={34} />
+              <h1 className="truncate text-3xl font-bold text-slate-900">
+                {event.name}
+              </h1>
+              <Badge tone="brand">{event.event_type}</Badge>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
+              <span className="flex items-center gap-1.5">
+                <CalendarDays className="h-4 w-4 text-brand-500" />
+                {formatDate(event.event_date)}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-brand-500" />
+                {event.location}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-brand-500" />
+                {event.guest_count} guests
+              </span>
+            </div>
+            <div className="mt-4">
+              <Countdown dateISO={event.event_date} />
+            </div>
           </div>
-          <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-600">
-            <span className="flex items-center gap-1.5">
-              <CalendarDays className="h-4 w-4 text-slate-400" />
-              {formatDate(event.event_date)}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 text-slate-400" />
-              {event.location}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-slate-400" />
-              {event.guest_count} guests
-            </span>
+
+          <div className="flex items-center gap-5">
+            <ProgressRing
+              pct={progress}
+              label={
+                <div className="text-center">
+                  <div className="text-xl font-bold text-slate-900">
+                    {progress}%
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                    ready
+                  </div>
+                </div>
+              }
+            />
+            <div className="max-w-[220px]">
+              <p className="font-display text-lg font-semibold text-slate-900">
+                {progress === 100
+                  ? "Your celebration is ready! 🎉"
+                  : "Your celebration is coming together!"}
+              </p>
+              {next ? (
+                <button
+                  onClick={() => navigate(next.to)}
+                  className="btn-primary mt-3 w-full"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Next: {next.label}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">
+                  Everything's on track.
+                </p>
+              )}
+            </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Link to={`/events/${eventId}/adapt`} className="btn-primary">
-            <RefreshCw className="h-4 w-4" /> Adapt plan
-          </Link>
-          <Link to={`/events/${eventId}/timeline`} className="btn-secondary">
-            <ListChecks className="h-4 w-4" /> Timeline
-          </Link>
-          <Link to={`/events/${eventId}/guests`} className="btn-secondary">
-            <Users className="h-4 w-4" /> Guests
-          </Link>
-          <Link
-            to={`/events/${eventId}/venues-discovery`}
-            className="btn-secondary"
-          >
-            <MapPin className="h-4 w-4" /> Venues
-          </Link>
-          <Link to={`/events/${eventId}/vendors`} className="btn-secondary">
-            Vendors
-          </Link>
+      </section>
+
+      {/* ───────── Milestone journey ───────── */}
+      <section className="card p-6" style={{ ["--i" as string]: 1 }}>
+        <div className="mb-5 flex items-center gap-2">
+          <PartyPopper className="h-5 w-5 text-brand-600" />
+          <h2 className="text-lg font-semibold text-slate-900">
+            Your planning journey
+          </h2>
         </div>
+        <MilestoneJourney milestones={milestones} />
+      </section>
+
+      {/* Quick actions */}
+      <div
+        className="flex flex-wrap gap-2"
+        style={{ ["--i" as string]: 2 }}
+      >
+        <Link to={`/events/${eventId}/adapt`} className="btn-primary">
+          <RefreshCw className="h-4 w-4" /> Adapt plan
+        </Link>
+        <Link to={`/events/${eventId}/budget`} className="btn-secondary">
+          <Wallet className="h-4 w-4" /> Budget
+        </Link>
+        <Link to={`/events/${eventId}/timeline`} className="btn-secondary">
+          <ListChecks className="h-4 w-4" /> Timeline
+        </Link>
+        <Link to={`/events/${eventId}/guests`} className="btn-secondary">
+          <Users className="h-4 w-4" /> Guests
+        </Link>
+        <Link to={`/events/${eventId}/venues-discovery`} className="btn-secondary">
+          <MapPin className="h-4 w-4" /> Venues
+        </Link>
+        <Link to={`/events/${eventId}/catering`} className="btn-secondary">
+          Catering
+        </Link>
       </div>
 
       {data.selected_venue && (
-        <div className="card p-5">
+        <div className="card p-5" style={{ ["--i" as string]: 3 }}>
           <h3 className="mb-2 flex items-center gap-2 font-semibold text-slate-900">
             <MapPin className="h-5 w-5 text-brand-600" /> Selected venue
           </h3>
@@ -109,8 +224,11 @@ export default function Dashboard() {
                 {data.selected_venue.name}
               </p>
               <p className="text-sm text-slate-500">
-                {data.selected_venue.location} · capacity{" "}
-                {data.selected_venue.capacity}
+                {data.selected_venue.location || "Location not listed"} ·
+                capacity{" "}
+                {data.selected_venue.capacity > 0
+                  ? data.selected_venue.capacity
+                  : "n/a"}
               </p>
             </div>
             <Link
@@ -129,7 +247,7 @@ export default function Dashboard() {
       )}
 
       {data.guest_summary && data.guest_summary.total_guests > 0 && (
-        <div className="card p-5">
+        <div className="card p-5" style={{ ["--i" as string]: 4 }}>
           <h3 className="mb-3 flex items-center gap-2 font-semibold text-slate-900">
             <Users className="h-5 w-5 text-brand-600" /> RSVP progress
           </h3>
@@ -138,51 +256,47 @@ export default function Dashboard() {
               label="Confirmed heads"
               value={data.guest_summary.confirmed_headcount}
             />
-            <RsvpStat
-              label="Attending"
-              value={data.guest_summary.total_headcount}
-            />
-            <RsvpStat
-              label="Invited (rows)"
-              value={data.guest_summary.total_guests}
-            />
+            <RsvpStat label="Attending" value={data.guest_summary.total_headcount} />
+            <RsvpStat label="Invited (rows)" value={data.guest_summary.total_guests} />
             <RsvpStat
               label="Declined"
               value={data.guest_summary.by_status["declined"] ?? 0}
             />
           </div>
-          <p className="mt-3 text-xs text-slate-500">
-            Confirmed headcount ({data.guest_summary.confirmed_headcount}) vs
-            planned guests ({event.guest_count}).{" "}
-            {data.guest_summary.confirmed_headcount > event.guest_count && (
+          {data.guest_summary.confirmed_headcount > event.guest_count && (
+            <p className="mt-3 text-xs text-slate-500">
+              Confirmed headcount ({data.guest_summary.confirmed_headcount})
+              exceeds planned guests ({event.guest_count}).{" "}
               <Link
                 to={`/events/${eventId}/adapt`}
                 className="font-medium text-brand-600 hover:underline"
               >
-                Confirmed exceeds plan — adapt guest count →
+                Adapt guest count →
               </Link>
-            )}
-          </p>
+            </p>
+          )}
         </div>
       )}
 
-      {genError && <ErrorBanner message={genError} />}
-
       {!plan ? (
         <EmptyState
-          title="No plan yet"
-          description="Generate a validated, budget-aware plan for this event."
+          icon={<Sparkles className="h-7 w-7" />}
+          title="Let's build your plan"
+          description="Generate a validated, budget-aware plan — it sets your category budgets, task timeline, and recommendations."
           action={
             <button className="btn-primary" onClick={generate} disabled={generating}>
-              {generating ? "Generating…" : "Generate plan"}
+              {generating ? "Generating…" : "Generate my plan"}
             </button>
           }
         />
       ) : (
         <>
-          <div className="flex items-center justify-between rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-800">
+          <div
+            className="flex items-center justify-between rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-800"
+            style={{ ["--i" as string]: 5 }}
+          >
             <span>
-              Active plan v{plan.version} · generated by{" "}
+              Active plan v{plan.version} · by{" "}
               <strong>{plan.generated_by}</strong>
               {plan.change_summary && <> · {plan.change_summary}</>}
             </span>
@@ -194,11 +308,13 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div
+            className="grid gap-6 lg:grid-cols-3"
+            style={{ ["--i" as string]: 6 }}
+          >
             <div className="lg:col-span-1">
               <BudgetSummaryCard budget={plan.budget} />
             </div>
-
             <div className="card p-6 lg:col-span-2">
               <div className="mb-4 flex items-center gap-2">
                 <Wallet className="h-5 w-5 text-brand-600" />
@@ -210,8 +326,10 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Upcoming deadlines */}
+          <div
+            className="grid gap-6 lg:grid-cols-3"
+            style={{ ["--i" as string]: 7 }}
+          >
             <div className="card p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="flex items-center gap-2 font-semibold text-slate-900">
@@ -242,7 +360,6 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Recommendations */}
             <div className="card p-6">
               <h3 className="mb-4 flex items-center gap-2 font-semibold text-slate-900">
                 <Lightbulb className="h-5 w-5 text-brand-600" /> Recommendations
@@ -257,7 +374,6 @@ export default function Dashboard() {
               </ul>
             </div>
 
-            {/* Risks */}
             <div className="card p-6">
               <h3 className="mb-4 flex items-center gap-2 font-semibold text-slate-900">
                 <AlertTriangle className="h-5 w-5 text-amber-500" /> Risks &
@@ -280,7 +396,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="card p-6">
+          <div className="card p-6" style={{ ["--i" as string]: 8 }}>
             <h3 className="mb-2 font-semibold text-slate-900">Plan overview</h3>
             <p className="text-sm text-slate-600">{plan.overview}</p>
             {plans.length > 1 && (
@@ -291,6 +407,19 @@ export default function Dashboard() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-48 w-full" />
+      <Skeleton className="h-28 w-full" />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Skeleton className="h-56 w-full" />
+        <Skeleton className="h-56 w-full lg:col-span-2" />
+      </div>
     </div>
   );
 }

@@ -15,14 +15,18 @@ export function EmptyState({
   title,
   description,
   action,
+  icon,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  icon?: ReactNode;
 }) {
   return (
-    <div className="card p-10 text-center">
-      <Info className="mx-auto h-8 w-8 text-slate-300" aria-hidden />
+    <div className="card animate-scale-in p-10 text-center">
+      <div className="mx-auto mb-1 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-500">
+        {icon ?? <Info className="h-7 w-7" aria-hidden />}
+      </div>
       <h3 className="mt-3 text-base font-semibold text-slate-800">{title}</h3>
       {description && (
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{description}</p>
@@ -61,14 +65,15 @@ export function Badge({
   tone = "slate",
 }: {
   children: ReactNode;
-  tone?: "slate" | "green" | "amber" | "rose" | "brand";
+  tone?: "slate" | "green" | "amber" | "rose" | "brand" | "plum";
 }) {
   const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-700",
+    slate: "bg-sand-200 text-slate-700",
     green: "bg-emerald-100 text-emerald-700",
-    amber: "bg-amber-100 text-amber-800",
+    amber: "bg-brand-100 text-brand-800",
     rose: "bg-rose-100 text-rose-700",
     brand: "bg-brand-100 text-brand-700",
+    plum: "bg-plum-100 text-plum-600",
   };
   return <span className={classNames("badge", tones[tone])}>{children}</span>;
 }
@@ -77,11 +82,13 @@ export function ProgressBar({ pct }: { pct: number }) {
   const clamped = Math.max(0, Math.min(100, pct));
   const over = pct > 100;
   return (
-    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+    <div className="h-2.5 w-full overflow-hidden rounded-full bg-sand-200">
       <div
         className={classNames(
-          "h-full rounded-full transition-all",
-          over ? "bg-rose-500" : "bg-brand-500"
+          "h-full rounded-full transition-all duration-700 ease-out",
+          over
+            ? "bg-rose-500"
+            : "bg-gradient-to-r from-brand-400 to-brand-600"
         )}
         style={{ width: `${clamped}%` }}
         role="progressbar"
@@ -91,6 +98,70 @@ export function ProgressBar({ pct }: { pct: number }) {
       />
     </div>
   );
+}
+
+/** Animated circular progress ring. Width grows via CSS transition. */
+export function ProgressRing({
+  pct,
+  size = 88,
+  stroke = 9,
+  label,
+}: {
+  pct: number;
+  size?: number;
+  stroke?: number;
+  label?: ReactNode;
+}) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (clamped / 100) * circ;
+  return (
+    <div
+      className="relative inline-flex items-center justify-center"
+      style={{ width: size, height: size }}
+      role="progressbar"
+      aria-valuenow={Math.round(clamped)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          className="text-sand-200"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          className="text-brand-500 transition-[stroke-dashoffset] duration-1000 ease-out"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circ}
+          strokeDashoffset={offset}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {label ?? (
+          <span className="text-lg font-bold text-slate-900">
+            {Math.round(clamped)}%
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Shimmer skeleton block. */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={classNames("skeleton", className)} aria-hidden />;
 }
 
 export function ConfirmDialog({
@@ -115,12 +186,13 @@ export function ConfirmDialog({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      onKeyDown={(e) => e.key === "Escape" && onCancel()}
     >
-      <div className="card w-full max-w-md p-6">
+      <div className="card-plain w-full max-w-md animate-scale-in p-6 shadow-lift">
         <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
         <p className="mt-2 text-sm text-slate-600">{message}</p>
         <div className="mt-6 flex justify-end gap-2">

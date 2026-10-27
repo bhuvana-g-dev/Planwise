@@ -12,6 +12,7 @@ import Vendors from "./pages/Vendors";
 import Guests from "./pages/Guests";
 import Catering from "./pages/Catering";
 import VenueDiscovery from "./pages/VenueDiscovery";
+import EventDay from "./pages/EventDay";
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="guests" element={<Guests />} />
           <Route path="catering" element={<Catering />} />
           <Route path="venues-discovery" element={<VenueDiscovery />} />
+          <Route path="event-day" element={<EventDay />} />
         </Route>
         <Route path="*" element={<Landing />} />
       </Route>

@@ -7,6 +7,7 @@ import {
   ListChecks,
   MapPinned,
   Menu,
+  PartyPopper,
   Receipt,
   RefreshCw,
   Store,
@@ -83,6 +84,16 @@ function groups(eventId: string): NavGroup[] {
           to: `${base}/vendors`,
           label: "Vendors & Quotes",
           icon: <Store className="h-4 w-4" />,
+        },
+      ],
+    },
+    {
+      title: "The big day",
+      items: [
+        {
+          to: `${base}/event-day`,
+          label: "Event Day",
+          icon: <PartyPopper className="h-4 w-4" />,
         },
       ],
     },

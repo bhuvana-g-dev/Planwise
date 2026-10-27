@@ -6,11 +6,19 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import {
+  BalloonSticker,
+  GiftSticker,
+  StarSticker,
+} from "../components/Stickers";
 
 export default function Landing() {
   return (
-    <div className="space-y-16">
-      <section className="grid items-center gap-10 md:grid-cols-2">
+    <div className="stagger space-y-16">
+      <section
+        className="grid items-center gap-10 md:grid-cols-2"
+        style={{ ["--i" as string]: 0 }}
+      >
         <div>
           <span className="badge bg-brand-100 text-brand-700">
             <Sparkles className="h-3.5 w-3.5" /> Adaptive event planning
@@ -37,7 +45,11 @@ export default function Landing() {
           </p>
         </div>
 
-        <div className="card p-6">
+        <div className="card relative overflow-hidden p-6">
+          <BalloonSticker
+            size={64}
+            className="pointer-events-none absolute -right-3 -top-3 animate-float opacity-80"
+          />
           <div className="flex items-baseline justify-between">
             <h3 className="font-semibold text-slate-900">Birthday · Madurai</h3>
             <span className="text-sm text-slate-500">50 guests</span>
@@ -54,19 +66,25 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-3">
+      <section
+        className="grid gap-6 md:grid-cols-3"
+        style={{ ["--i" as string]: 1 }}
+      >
         <Feature
           icon={<Scale className="h-5 w-5" />}
+          sticker={<StarSticker size={40} />}
           title="Deterministic budget engine"
           body="All money math runs on the backend in integer paise. The AI never decides your numbers."
         />
         <Feature
           icon={<CalendarCheck className="h-5 w-5" />}
+          sticker={<GiftSticker size={40} />}
           title="Change-impact reports"
           body="Every change produces a before/after diff: affected categories, tasks, trade-offs and preserved constraints."
         />
         <Feature
           icon={<ShieldCheck className="h-5 w-5" />}
+          sticker={<BalloonSticker size={40} />}
           title="Approve before it sticks"
           body="Proposals are never auto-applied. Reject leaves your plan untouched; stale approvals are blocked."
         />
@@ -86,15 +104,22 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function Feature({
   icon,
+  sticker,
   title,
   body,
 }: {
   icon: React.ReactNode;
+  sticker?: React.ReactNode;
   title: string;
   body: string;
 }) {
   return (
-    <div className="card p-6">
+    <div className="card relative overflow-hidden p-6 transition hover:-translate-y-0.5 hover:shadow-lift">
+      {sticker && (
+        <span className="pointer-events-none absolute right-3 top-3 opacity-70">
+          {sticker}
+        </span>
+      )}
       <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
         {icon}
       </span>
