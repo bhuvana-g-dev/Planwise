@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   Check,
@@ -19,15 +19,13 @@ import type {
   VenueRecommendation,
   VenueType,
 } from "../types";
-import {
-  Badge,
-  EmptyState,
-  ErrorBanner,
-  Spinner,
-  SuccessBanner,
-} from "../components/ui";
-import VenueMap from "../components/VenueMap";
+import { Badge, EmptyState, ErrorBanner, Skeleton, Spinner } from "../components/ui";
+import { useToast } from "../components/Toast";
 import { formatINR, titleCase } from "../utils/format";
+
+// Lazy-load the map (and therefore Leaflet) only when the Map view is opened —
+// keeps ~150KB of mapping code out of the initial venue page load.
+const VenueMap = lazy(() => import("../components/VenueMap"));
 
 const TYPES: { value: VenueType | ""; label: string }[] = [
   { value: "", label: "Any type" },
@@ -78,9 +76,9 @@ export default function VenueDiscovery() {
   const [shortlist, setShortlist] = useState<Venue[]>([]);
   const [selected, setSelected] = useState<SelectedVenue | null>(null);
   const [restoring, setRestoring] = useState(true);
-  const [msg, setMsg] = useState<string | null>(null);
   const [rec, setRec] = useState<VenueRecommendation | null>(null);
   const [recBusy, setRecBusy] = useState(false);
+  const toast = useToast();
 
   // Recommendation preferences (P4)
   const [indoorPref, setIndoorPref] = useState<"any" | "indoor" | "outdoor">(
@@ -215,7 +213,6 @@ export default function VenueDiscovery() {
 
   async function select(v: Venue) {
     if (!eventId) return;
-    setMsg(null);
     try {
       if (!inShortlist(v.id)) {
         const next = await api.shortlistVenue(eventId, v);
@@ -224,9 +221,11 @@ export default function VenueDiscovery() {
       const sel = await api.selectVenue(eventId, v.id);
       setSelected(sel);
       setFocused(sel.venue);
-      setMsg(`Selected ${sel.venue.name} for this event.`);
+      toast.success(`Selected ${sel.venue.name} for this event.`);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to select venue");
+      const em = e instanceof ApiError ? e.message : "Failed to select venue";
+      setError(em);
+      toast.error(em);
     }
   }
 
@@ -291,7 +290,6 @@ export default function VenueDiscovery() {
       </div>
 
       {error && <ErrorBanner message={error} />}
-      {msg && <SuccessBanner message={msg} />}
 
       {restoring ? (
         <Spinner label="Restoring saved selection…" />
@@ -571,7 +569,11 @@ export default function VenueDiscovery() {
           }
         />
       ) : view === "map" ? (
-        <VenueMap venues={venues} focused={focused} onFocus={setFocused} />
+        <Suspense
+          fallback={<Skeleton className="h-[520px] w-full rounded-2xl" />}
+        >
+          <VenueMap venues={venues} focused={focused} onFocus={setFocused} />
+        </Suspense>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -164,6 +164,20 @@ export function Skeleton({ className = "" }: { className?: string }) {
   return <div className={classNames("skeleton", className)} aria-hidden />;
 }
 
+/** Full-page loading fallback used by lazy-loaded routes (matches skeletons). */
+export function PageFallback() {
+  return (
+    <div className="space-y-6" role="status" aria-label="Loading page">
+      <Skeleton className="h-10 w-64" />
+      <Skeleton className="h-40 w-full" />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Skeleton className="h-52 w-full" />
+        <Skeleton className="h-52 w-full lg:col-span-2" />
+      </div>
+    </div>
+  );
+}
+
 export function ConfirmDialog({
   open,
   title,
