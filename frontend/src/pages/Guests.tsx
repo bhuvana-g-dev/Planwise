@@ -3,7 +3,15 @@ import { Link, useParams } from "react-router-dom";
 import { Plus, Save, Trash2, Users } from "lucide-react";
 import { api, ApiError } from "../services/api";
 import type { Guest, GuestSummary, RsvpStatus } from "../types";
-import { Badge, EmptyState, ErrorBanner, Spinner, SuccessBanner } from "../components/ui";
+import { Badge, EmptyState, ErrorBanner, Skeleton } from "../components/ui";
+import { useToast } from "../components/Toast";
+
+const RSVP_TONE: Record<RsvpStatus, "green" | "amber" | "rose" | "slate"> = {
+  confirmed: "green",
+  tentative: "amber",
+  declined: "rose",
+  invited: "slate",
+};
 
 const RSVP_OPTIONS: RsvpStatus[] = [
   "invited",
@@ -27,12 +35,12 @@ function blankGuest(): Guest {
 
 export default function Guests() {
   const { eventId } = useParams();
+  const toast = useToast();
   const [rows, setRows] = useState<Guest[]>([]);
   const [summary, setSummary] = useState<GuestSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!eventId) return;
@@ -50,7 +58,6 @@ export default function Guests() {
 
   function update(i: number, patch: Partial<Guest>) {
     setRows((r) => r.map((g, j) => (j === i ? { ...g, ...patch } : g)));
-    setSaved(false);
   }
 
   async function save() {
@@ -62,19 +69,37 @@ export default function Guests() {
       const d = await api.saveGuests(eventId, valid);
       setRows(d.guests);
       setSummary(d.summary);
-      setSaved(true);
+      toast.success(
+        `Guest list saved · ${d.summary.confirmed_headcount} confirmed.`
+      );
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to save guests");
+      const msg = e instanceof ApiError ? e.message : "Failed to save guests";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) return <Spinner label="Loading guests…" />;
+  if (loading)
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-9 w-56" />
+        <div className="grid gap-4 sm:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="stagger space-y-6">
+      <div
+        className="flex items-center justify-between"
+        style={{ ["--i" as string]: 0 }}
+      >
         <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
           <Users className="h-6 w-6 text-brand-600" /> Guest management
         </h1>
@@ -84,10 +109,9 @@ export default function Guests() {
       </div>
 
       {error && <ErrorBanner message={error} />}
-      {saved && <SuccessBanner message="Guest list saved. RSVP counts updated." />}
 
       {summary && (
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-4" style={{ ["--i" as string]: 1 }}>
           <Stat label="Guests (rows)" value={summary.total_guests} />
           <Stat label="Confirmed heads" value={summary.confirmed_headcount} />
           <Stat
@@ -102,7 +126,7 @@ export default function Guests() {
       )}
 
       {summary && Object.keys(summary.dietary_counts).length > 0 && (
-        <div className="card p-4">
+        <div className="card p-4" style={{ ["--i" as string]: 2 }}>
           <p className="mb-2 text-sm font-medium text-slate-700">
             Dietary needs (headcount) — confirm with your caterer
           </p>
@@ -118,6 +142,7 @@ export default function Guests() {
 
       {rows.length === 0 ? (
         <EmptyState
+          icon={<Users className="h-7 w-7" />}
           title="No guests yet"
           description="Add guests to track RSVPs, plus-ones, and dietary needs. Confirmed headcount feeds your catering estimates."
           action={
@@ -130,9 +155,9 @@ export default function Guests() {
           }
         />
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="card overflow-x-auto" style={{ ["--i" as string]: 3 }}>
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+            <thead className="bg-sand-100 text-left text-xs uppercase text-slate-500">
               <tr>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Group</th>
@@ -142,9 +167,9 @@ export default function Guests() {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-sand-200">
               {rows.map((g, i) => (
-                <tr key={i}>
+                <tr key={i} className="transition hover:bg-sand-50">
                   <td className="px-4 py-2">
                     <input
                       className="input"
@@ -162,19 +187,22 @@ export default function Guests() {
                     />
                   </td>
                   <td className="px-4 py-2">
-                    <select
-                      className="input"
-                      value={g.rsvp}
-                      onChange={(e) =>
-                        update(i, { rsvp: e.target.value as RsvpStatus })
-                      }
-                    >
-                      {RSVP_OPTIONS.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <select
+                        className="input"
+                        value={g.rsvp}
+                        onChange={(e) =>
+                          update(i, { rsvp: e.target.value as RsvpStatus })
+                        }
+                      >
+                        {RSVP_OPTIONS.map((o) => (
+                          <option key={o} value={o}>
+                            {o}
+                          </option>
+                        ))}
+                      </select>
+                      <Badge tone={RSVP_TONE[g.rsvp]}>{g.rsvp}</Badge>
+                    </div>
                   </td>
                   <td className="px-4 py-2">
                     <input

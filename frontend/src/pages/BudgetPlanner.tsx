@@ -1,14 +1,25 @@
 import { Link, useParams } from "react-router-dom";
+import { PieChart, RefreshCw, Wallet } from "lucide-react";
 import { useEventDetail } from "../hooks/useEventDetail";
-import { Badge, EmptyState, ErrorBanner, Spinner } from "../components/ui";
+import { Badge, EmptyState, ErrorBanner, Skeleton } from "../components/ui";
 import BudgetSummaryCard from "../components/BudgetSummaryCard";
+import BudgetChart from "../components/BudgetChart";
 import { formatINR, titleCase } from "../utils/format";
 
 export default function BudgetPlanner() {
   const { eventId } = useParams();
   const { data, loading, error } = useEventDetail(eventId);
 
-  if (loading) return <Spinner label="Loading budget…" />;
+  if (loading)
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-9 w-48" />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full lg:col-span-2" />
+        </div>
+      </div>
+    );
   if (error) return <ErrorBanner message={error} />;
   if (!data) return null;
   const plan = data.active_plan;
@@ -16,8 +27,9 @@ export default function BudgetPlanner() {
   if (!plan)
     return (
       <EmptyState
+        icon={<Wallet className="h-7 w-7" />}
         title="No plan to budget yet"
-        description="Generate a plan from the dashboard first."
+        description="Generate a plan from the dashboard first — it sets your category budgets automatically."
         action={
           <Link to={`/events/${eventId}`} className="btn-primary">
             Back to dashboard
@@ -27,69 +39,87 @@ export default function BudgetPlanner() {
     );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">Budget planner</h1>
+    <div className="stagger space-y-6">
+      <div
+        className="flex items-center justify-between"
+        style={{ ["--i" as string]: 0 }}
+      >
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+          <Wallet className="h-6 w-6 text-brand-600" /> Budget planner
+        </h1>
         <Link to={`/events/${eventId}/adapt`} className="btn-primary">
-          Change budget
+          <RefreshCw className="h-4 w-4" /> Change budget
         </Link>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div
+        className="grid gap-6 lg:grid-cols-3"
+        style={{ ["--i" as string]: 1 }}
+      >
         <div className="lg:col-span-1">
           <BudgetSummaryCard budget={plan.budget} />
         </div>
-
-        <div className="card overflow-hidden lg:col-span-2">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-5 py-3">Item</th>
-                <th className="px-5 py-3">Category</th>
-                <th className="px-5 py-3">Type</th>
-                <th className="px-5 py-3 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {plan.expenses.map((e) => (
-                <tr key={e.id}>
-                  <td className="px-5 py-3">
-                    <p className="font-medium text-slate-800">{e.label}</p>
-                    {e.assumptions && (
-                      <p className="text-xs text-slate-400">{e.assumptions}</p>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-slate-600">
-                    {titleCase(e.category)}
-                  </td>
-                  <td className="px-5 py-3">
-                    {e.negotiable ? (
-                      <Badge tone="slate">Flexible</Badge>
-                    ) : (
-                      <Badge tone="amber">Locked</Badge>
-                    )}
-                    {e.source === "estimate" && (
-                      <span className="ml-1 text-xs text-slate-400">est.</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-right font-medium text-slate-900">
-                    {formatINR(e.amount_paise)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-slate-50 font-semibold">
-              <tr>
-                <td className="px-5 py-3" colSpan={3}>
-                  Total allocated
-                </td>
-                <td className="px-5 py-3 text-right">
-                  {formatINR(plan.budget.allocated_paise)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+        <div className="card p-6 lg:col-span-2">
+          <div className="mb-4 flex items-center gap-2">
+            <PieChart className="h-5 w-5 text-brand-600" />
+            <h3 className="font-semibold text-slate-900">Category breakdown</h3>
+          </div>
+          <BudgetChart budget={plan.budget} />
         </div>
+      </div>
+
+      <div
+        className="card overflow-hidden"
+        style={{ ["--i" as string]: 2 }}
+      >
+        <table className="w-full text-sm">
+          <thead className="bg-sand-100 text-left text-xs uppercase text-slate-500">
+            <tr>
+              <th className="px-5 py-3">Item</th>
+              <th className="px-5 py-3">Category</th>
+              <th className="px-5 py-3">Type</th>
+              <th className="px-5 py-3 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-sand-200">
+            {plan.expenses.map((e) => (
+              <tr key={e.id} className="transition hover:bg-sand-50">
+                <td className="px-5 py-3">
+                  <p className="font-medium text-slate-800">{e.label}</p>
+                  {e.assumptions && (
+                    <p className="text-xs text-slate-400">{e.assumptions}</p>
+                  )}
+                </td>
+                <td className="px-5 py-3 text-slate-600">
+                  {titleCase(e.category)}
+                </td>
+                <td className="px-5 py-3">
+                  {e.negotiable ? (
+                    <Badge tone="slate">Flexible</Badge>
+                  ) : (
+                    <Badge tone="amber">Locked</Badge>
+                  )}
+                  {e.source === "estimate" && (
+                    <span className="ml-1 text-xs text-slate-400">est.</span>
+                  )}
+                </td>
+                <td className="px-5 py-3 text-right font-medium text-slate-900">
+                  {formatINR(e.amount_paise)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot className="bg-sand-100 font-semibold">
+            <tr>
+              <td className="px-5 py-3" colSpan={3}>
+                Total allocated
+              </td>
+              <td className="px-5 py-3 text-right">
+                {formatINR(plan.budget.allocated_paise)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
 
       <p className="text-xs text-slate-400">
