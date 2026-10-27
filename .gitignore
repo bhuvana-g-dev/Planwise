@@ -25,6 +25,10 @@ serviceAccount*.json
 # Data (local JSON store)
 backend/.data/
 
+# Kironomics (personal usage tracker — contains a private API key, never commit)
+.kiro/kironomics_report.py
+.kiro/hooks/kironomics.json
+
 # Editor
 .vscode/
 .idea/

@@ -182,6 +182,70 @@ def test_recommend_fallback_without_gemini(monkeypatch):
     assert "not verified" in body["disclaimer"].lower()
 
 
+def test_recommend_respects_indoor_pref_and_amenities():
+    ev = client.post("/api/events", json=_event()).json()
+    client.post(f"/api/events/{ev['id']}/plans")
+    r = client.post(f"/api/events/{ev['id']}/venues/recommend",
+                    json={"indoor_pref": "outdoor",
+                          "required_amenities": ["parking"]})
+    assert r.status_code == 200
+    recs = r.json()["recommendations"]
+    assert recs, "should return at least one suggestion"
+    # Top suggestion should prefer an outdoor venue with the required amenity.
+    top = recs[0]
+    assert top["outdoor"] is True
+    assert "parking" in [a.lower() for a in top["amenities"]]
+
+
+# --- P1 regression: selected venue restored after "reload" ---
+def test_selected_venue_restored_on_reload():
+    ev = client.post("/api/events", json=_event()).json()
+    client.post(f"/api/events/{ev['id']}/plans")
+    venue = client.post("/api/venues/search",
+                        json={"city": "Madurai"}).json()["results"][0]
+    client.post(f"/api/events/{ev['id']}/venues/shortlist",
+                json={"venue": venue})
+    client.post(f"/api/events/{ev['id']}/venues/select",
+                json={"venue_id": venue["id"]})
+
+    # Simulate a page reload: a brand-new GET of the event detail must still
+    # carry the selection + shortlist (this is what the frontend restores from).
+    detail = client.get(f"/api/events/{ev['id']}").json()
+    assert detail["selected_venue"] is not None
+    assert detail["selected_venue"]["id"] == venue["id"]
+    assert any(v["id"] == venue["id"] for v in detail["venue_shortlist"])
+
+    # And re-selecting by id (what the UI does to refresh the budget compare)
+    # returns the authoritative comparison again.
+    again = client.post(f"/api/events/{ev['id']}/venues/select",
+                        json={"venue_id": venue["id"]})
+    assert again.status_code == 200
+    assert again.json()["venue_budget_paise"] is not None
+
+
+# --- P5: max_capacity + amenity filters ---
+def test_filter_max_capacity():
+    page = venue_service.search(VenueQuery(max_capacity=200, page_size=50))
+    # demo venues with a known capacity must all be <= 200; unknown (0) allowed
+    assert all(v.capacity == 0 or v.capacity <= 200 for v in page.results)
+    # a 600-capacity demo venue must be excluded
+    assert all(v.capacity != 600 for v in page.results)
+
+
+def test_filter_min_and_max_capacity_window():
+    page = venue_service.search(
+        VenueQuery(min_capacity=200, max_capacity=400, page_size=50))
+    for v in page.results:
+        if v.capacity:
+            assert 200 <= v.capacity <= 400
+
+
+def test_filter_by_amenity_subset():
+    page = venue_service.search(VenueQuery(amenities=["ac"], page_size=50))
+    assert page.results
+    assert all("ac" in [a.lower() for a in v.amenities] for v in page.results)
+
+
 # --------------------------------------------------------------------------
 # OpenStreetMap (real data) — network mocked, deterministic
 # --------------------------------------------------------------------------

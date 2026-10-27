@@ -342,7 +342,7 @@ export interface Venue {
   lng: number | null;
   image_url: string;
   contact: string;
-  source: "demo" | "user" | "provider";
+  source: "demo" | "user" | "osm" | "provider";
   notes: string;
 }
 
@@ -351,6 +351,7 @@ export interface VenueQuery {
   venue_type?: VenueType | null;
   city?: string;
   min_capacity?: number | null;
+  max_capacity?: number | null;
   max_price_inr?: number | null;
   indoor?: boolean | null;
   outdoor?: boolean | null;

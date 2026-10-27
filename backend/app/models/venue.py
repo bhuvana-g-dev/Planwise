@@ -74,6 +74,7 @@ class VenueQuery(BaseModel):
     venue_type: Optional[VenueType] = None
     city: str = ""
     min_capacity: Optional[int] = Field(default=None, ge=0)
+    max_capacity: Optional[int] = Field(default=None, ge=0)
     max_price_inr: Optional[float] = Field(default=None, ge=0)
     indoor: Optional[bool] = None
     outdoor: Optional[bool] = None

@@ -29,6 +29,30 @@ const SelectedIcon = L.icon({
   className: "hue-rotate-[260deg]",
 });
 
+// Source-specific honesty label. Never implies verification the data lacks.
+export function sourceLabelText(source: Venue["source"]): string {
+  switch (source) {
+    case "osm":
+      return "OpenStreetMap data (© OSM contributors) — price, capacity & availability may be unknown; verify with the venue";
+    case "user":
+      return "User-provided entry — not externally verified";
+    case "provider":
+      return "Provider data — verify details with the venue";
+    case "demo":
+    default:
+      return "Demo venue — illustrative & unverified, not a real listing";
+  }
+}
+
+function SourceLabel({ source }: { source: Venue["source"] }) {
+  const tone = source === "osm" ? "text-sky-700" : "text-amber-600";
+  return (
+    <p className={`text-[10px] uppercase tracking-wide ${tone}`}>
+      {sourceLabelText(source)}
+    </p>
+  );
+}
+
 function Recenter({ venue }: { venue: Venue | null }) {
   const map = useMap();
   useEffect(() => {
@@ -81,16 +105,19 @@ export default function VenueMap({
             <Popup>
               <div className="space-y-1">
                 <p className="font-semibold">{v.name}</p>
-                <p className="text-xs text-slate-500">{v.location}</p>
+                {v.location && (
+                  <p className="text-xs text-slate-500">{v.location}</p>
+                )}
                 <p className="text-xs">
-                  Capacity {v.capacity} ·{" "}
+                  {v.capacity > 0
+                    ? `Capacity ${v.capacity}`
+                    : "Capacity not listed"}{" "}
+                  ·{" "}
                   {v.est_price_paise != null
                     ? formatINR(v.est_price_paise)
-                    : "price n/a"}
+                    : "price not listed"}
                 </p>
-                <p className="text-[10px] uppercase tracking-wide text-amber-600">
-                  Demo venue — verify independently
-                </p>
+                <SourceLabel source={v.source} />
               </div>
             </Popup>
           </Marker>

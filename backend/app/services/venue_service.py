@@ -145,8 +145,10 @@ def _matches(v: Venue, q: VenueQuery) -> bool:
         return False
     if q.city and q.city.lower() not in v.city.lower():
         return False
-    # capacity 0 = unknown (common for OSM); don't exclude on min_capacity.
+    # capacity 0 = unknown (common for OSM); don't exclude on capacity bounds.
     if q.min_capacity is not None and v.capacity and v.capacity < q.min_capacity:
+        return False
+    if q.max_capacity is not None and v.capacity and v.capacity > q.max_capacity:
         return False
     if q.max_price_inr is not None and v.est_price_paise is not None:
         if v.est_price_paise > rupees_to_paise(q.max_price_inr):

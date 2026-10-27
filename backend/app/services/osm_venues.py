@@ -132,19 +132,28 @@ def _geocode_city(city: str) -> Optional[tuple[float, float, float, float]]:
 def _overpass_query(bbox: tuple[float, float, float, float]) -> str:
     s, w, n, e = bbox
     box = f"{s},{w},{n},{e}"
-    # Event-relevant features. nwr = nodes, ways, relations.
+    # Event-relevant features. nwr = nodes, ways, relations. Named only, so we
+    # never surface anonymous polygons. _classify maps each tag to a VenueType.
     return f"""
     [out:json][timeout:25];
     (
-      nwr["amenity"="events_venue"]({box});
-      nwr["amenity"="community_centre"]({box});
-      nwr["amenity"="conference_centre"]({box});
+      nwr["amenity"="events_venue"]["name"]({box});
+      nwr["amenity"="events_centre"]["name"]({box});
+      nwr["amenity"="banquet_hall"]["name"]({box});
+      nwr["amenity"="wedding_hall"]["name"]({box});
+      nwr["amenity"="marquee"]["name"]({box});
+      nwr["amenity"="community_centre"]["name"]({box});
+      nwr["amenity"="conference_centre"]["name"]({box});
+      nwr["tourism"="conference_centre"]["name"]({box});
       nwr["tourism"="hotel"]["name"]({box});
-      nwr["leisure"="garden"]["name"]({box});
-      nwr["amenity"="banquet_hall"]({box});
+      nwr["tourism"="resort"]["name"]({box});
       nwr["building"="hotel"]["name"]({box});
+      nwr["leisure"="garden"]["name"]({box});
+      nwr["leisure"="park"]["name"]({box});
+      nwr["leisure"="beach_resort"]["name"]({box});
+      nwr["natural"="beach"]["name"]({box});
     );
-    out center tags 60;
+    out center tags 120;
     """
 
 
