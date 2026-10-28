@@ -1,7 +1,10 @@
 import { Link, useParams } from "react-router-dom";
-import { PieChart, RefreshCw, Wallet } from "lucide-react";
+import { PieChart, RefreshCw } from "lucide-react";
 import { useEventDetail } from "../hooks/useEventDetail";
 import { Badge, EmptyState, ErrorBanner, Skeleton } from "../components/ui";
+import ModuleHeader from "../components/ModuleHeader";
+import { BudgetArt } from "../components/Illustrations";
+import { eventTheme } from "../theme/eventTheme";
 import BudgetSummaryCard from "../components/BudgetSummaryCard";
 import BudgetChart from "../components/BudgetChart";
 import { formatINR, titleCase } from "../utils/format";
@@ -23,11 +26,12 @@ export default function BudgetPlanner() {
   if (error) return <ErrorBanner message={error} />;
   if (!data) return null;
   const plan = data.active_plan;
+  const theme = eventTheme(data.event.event_type, data.event.style);
 
   if (!plan)
     return (
       <EmptyState
-        icon={<Wallet className="h-7 w-7" />}
+        icon={<BudgetArt className="h-9 w-9" />}
         title="No plan to budget yet"
         description="Generate a plan from the dashboard first — it sets your category budgets automatically."
         action={
@@ -40,16 +44,21 @@ export default function BudgetPlanner() {
 
   return (
     <div className="stagger space-y-6">
-      <div
-        className="flex items-center justify-between"
-        style={{ ["--i" as string]: 0 }}
-      >
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <Wallet className="h-6 w-6 text-brand-600" /> Budget planner
-        </h1>
-        <Link to={`/events/${eventId}/adapt`} className="btn-primary">
-          <RefreshCw className="h-4 w-4" /> Change budget
-        </Link>
+      <div style={{ ["--i" as string]: 0 }}>
+        <ModuleHeader
+          theme={theme}
+          eyebrow="Budget planner"
+          title="Budget planner"
+          subtitle={`${data.event.name} · ${formatINR(
+            plan.budget.budget_paise
+          )} total budget`}
+          art={<BudgetArt className="h-16 w-16" />}
+          actions={
+            <Link to={`/events/${eventId}/adapt`} className="btn-primary">
+              <RefreshCw className="h-4 w-4" /> Change budget
+            </Link>
+          }
+        />
       </div>
 
       <div

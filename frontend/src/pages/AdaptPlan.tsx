@@ -19,6 +19,9 @@ import {
   ErrorBanner,
   Skeleton,
 } from "../components/ui";
+import ModuleHeader from "../components/ModuleHeader";
+import { EmptyPlanArt } from "../components/Illustrations";
+import { eventTheme } from "../theme/eventTheme";
 import { useToast } from "../components/Toast";
 import { api, ApiError } from "../services/api";
 import type { ChangeType, ReplanRequest, ReplanResult } from "../types";
@@ -54,11 +57,12 @@ export default function AdaptPlan() {
   if (error) return <ErrorBanner message={error} />;
   if (!data) return null;
   const plan = data.active_plan;
+  const theme = eventTheme(data.event.event_type, data.event.style);
 
   if (!plan)
     return (
       <EmptyState
-        icon={<RefreshCw className="h-7 w-7" />}
+        icon={<EmptyPlanArt className="h-12 w-16" />}
         title="No active plan to adapt"
         description="Generate a plan first, then you can change the budget, guests or date and preview the impact."
         action={
@@ -123,22 +127,21 @@ export default function AdaptPlan() {
 
   return (
     <div className="stagger space-y-6">
-      <div
-        className="flex items-center justify-between"
-        style={{ ["--i" as string]: 0 }}
-      >
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-            <RefreshCw className="h-6 w-6 text-brand-600" /> Adapt plan
-          </h1>
-          <p className="text-sm text-slate-500">
-            Current plan v{plan.version} · {formatINR(plan.budget.budget_paise)}{" "}
-            budget
-          </p>
-        </div>
-        <Link to={`/events/${eventId}`} className="btn-secondary">
-          Back to dashboard
-        </Link>
+      <div style={{ ["--i" as string]: 0 }}>
+        <ModuleHeader
+          theme={theme}
+          eyebrow="Adapt plan"
+          title="Adapt plan"
+          subtitle={`Current plan v${plan.version} · ${formatINR(
+            plan.budget.budget_paise
+          )} budget`}
+          art={<RefreshCw className="h-12 w-12" style={{ color: theme.accent }} />}
+          actions={
+            <Link to={`/events/${eventId}`} className="btn-secondary">
+              Back to dashboard
+            </Link>
+          }
+        />
       </div>
 
       {actionError && <ErrorBanner message={actionError} />}

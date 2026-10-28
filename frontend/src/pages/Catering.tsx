@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
-  ChefHat,
   Plus,
   Save,
   Sparkles,
@@ -23,6 +22,10 @@ import {
   ErrorBanner,
   Skeleton,
 } from "../components/ui";
+import ModuleHeader from "../components/ModuleHeader";
+import { CateringArt } from "../components/Illustrations";
+import { eventTheme } from "../theme/eventTheme";
+import { useEventDetail } from "../hooks/useEventDetail";
 import { useToast } from "../components/Toast";
 import { formatINR, titleCase } from "../utils/format";
 
@@ -69,6 +72,12 @@ function blankItem(): MenuItem {
 export default function Catering() {
   const { eventId } = useParams();
   const toast = useToast();
+  // Only used to theme the header; catering data is loaded via getCatering.
+  const { data: eventDetail } = useEventDetail(eventId);
+  const theme = eventTheme(
+    eventDetail?.event.event_type,
+    eventDetail?.event.style
+  );
   const [state, setState] = useState<CateringState | null>(null);
   const [items, setItems] = useState<MenuItem[]>([]);
   const [prefs, setPrefs] = useState<CateringPreferences | null>(null);
@@ -206,16 +215,21 @@ export default function Catering() {
 
   return (
     <div className="stagger space-y-6">
-      <div
-        className="flex items-center justify-between"
-        style={{ ["--i" as string]: 0 }}
-      >
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <ChefHat className="h-6 w-6 text-brand-600" /> Catering & menu
-        </h1>
-        <Link to={`/events/${eventId}`} className="btn-secondary">
-          Back to dashboard
-        </Link>
+      <div style={{ ["--i" as string]: 0 }}>
+        <ModuleHeader
+          theme={theme}
+          eyebrow="Catering & menu"
+          title="Catering & menu"
+          subtitle={`${hc.catering_headcount} servings · ${formatINR(
+            s.cost_per_guest_paise
+          )} per guest`}
+          art={<CateringArt className="h-16 w-16" />}
+          actions={
+            <Link to={`/events/${eventId}`} className="btn-secondary">
+              Back to dashboard
+            </Link>
+          }
+        />
       </div>
 
       {error && <ErrorBanner message={error} />}
@@ -454,8 +468,14 @@ export default function Catering() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  No menu items yet. Generate with AI or add manually.
+                <td colSpan={8} className="px-4 py-10 text-center">
+                  <CateringArt className="mx-auto h-14 w-14 opacity-90" />
+                  <p className="mt-2 text-sm font-medium text-slate-700">
+                    No menu items yet
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    Generate a menu with AI or add dishes manually.
+                  </p>
                 </td>
               </tr>
             )}

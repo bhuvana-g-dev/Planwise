@@ -5,7 +5,6 @@ import {
   Heart,
   List,
   MapPin,
-  MapPinned,
   Search,
   Sparkles,
   Star,
@@ -20,6 +19,9 @@ import type {
   VenueType,
 } from "../types";
 import { Badge, EmptyState, ErrorBanner, Skeleton, Spinner } from "../components/ui";
+import ModuleHeader from "../components/ModuleHeader";
+import { VenueArt } from "../components/Illustrations";
+import { eventTheme } from "../theme/eventTheme";
 import { useToast } from "../components/Toast";
 import { formatINR, titleCase } from "../utils/format";
 
@@ -78,6 +80,9 @@ export default function VenueDiscovery() {
   const [restoring, setRestoring] = useState(true);
   const [rec, setRec] = useState<VenueRecommendation | null>(null);
   const [recBusy, setRecBusy] = useState(false);
+  // Captured from the restore fetch below, used only to theme the header.
+  const [eventType, setEventType] = useState<string | undefined>();
+  const [eventStyle, setEventStyle] = useState<string | undefined>();
   const toast = useToast();
 
   // Recommendation preferences (P4)
@@ -127,6 +132,8 @@ export default function VenueDiscovery() {
         ]);
         if (cancelled) return;
         setShortlist(sl);
+        setEventType(detail.event.event_type);
+        setEventStyle(detail.event.style);
         if (detail.selected_venue) {
           // Re-fetch the authoritative budget comparison from the backend
           // rather than trusting a stale client copy.
@@ -259,17 +266,26 @@ export default function VenueDiscovery() {
 
   const liveOsm = sourceMode === "osm";
   const demoFallback = sourceMode === "demo_fallback";
+  const theme = eventTheme(eventType, eventStyle);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <MapPinned className="h-6 w-6 text-brand-600" /> Venue discovery
-        </h1>
-        <Link to={`/events/${eventId}`} className="btn-secondary">
-          Back to dashboard
-        </Link>
-      </div>
+      <ModuleHeader
+        theme={theme}
+        eyebrow="Venue discovery"
+        title="Venue discovery"
+        subtitle={
+          total > 0
+            ? `${total} venue${total === 1 ? "" : "s"} found`
+            : "Find the perfect place for your celebration"
+        }
+        art={<VenueArt className="h-16 w-16" />}
+        actions={
+          <Link to={`/events/${eventId}`} className="btn-secondary">
+            Back to dashboard
+          </Link>
+        }
+      />
 
       {/* Source-mode indicator (P3): live OSM vs demo fallback */}
       <div
@@ -560,6 +576,7 @@ export default function VenueDiscovery() {
         <Spinner label="Searching venues…" />
       ) : venues.length === 0 ? (
         <EmptyState
+          icon={<VenueArt className="h-9 w-9" />}
           title="No venues match your filters"
           description="Try broadening the keyword, city, capacity, price range, or amenities. Live OpenStreetMap search needs a city."
           action={

@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Plus, Save, Trash2, Users } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { api, ApiError } from "../services/api";
 import type { Guest, GuestSummary, RsvpStatus } from "../types";
 import { Badge, EmptyState, ErrorBanner, Skeleton } from "../components/ui";
+import ModuleHeader from "../components/ModuleHeader";
+import { GuestsArt } from "../components/Illustrations";
+import { eventTheme } from "../theme/eventTheme";
+import { useEventDetail } from "../hooks/useEventDetail";
 import { useToast } from "../components/Toast";
 
 const RSVP_TONE: Record<RsvpStatus, "green" | "amber" | "rose" | "slate"> = {
@@ -36,6 +40,13 @@ function blankGuest(): Guest {
 export default function Guests() {
   const { eventId } = useParams();
   const toast = useToast();
+  // Event detail is used only to theme the header; the guest list itself is
+  // still loaded/saved through the dedicated guests API below.
+  const { data: eventDetail } = useEventDetail(eventId);
+  const theme = eventTheme(
+    eventDetail?.event.event_type,
+    eventDetail?.event.style
+  );
   const [rows, setRows] = useState<Guest[]>([]);
   const [summary, setSummary] = useState<GuestSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,16 +107,23 @@ export default function Guests() {
 
   return (
     <div className="stagger space-y-6">
-      <div
-        className="flex items-center justify-between"
-        style={{ ["--i" as string]: 0 }}
-      >
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <Users className="h-6 w-6 text-brand-600" /> Guest management
-        </h1>
-        <Link to={`/events/${eventId}`} className="btn-secondary">
-          Back to dashboard
-        </Link>
+      <div style={{ ["--i" as string]: 0 }}>
+        <ModuleHeader
+          theme={theme}
+          eyebrow="Guest management"
+          title="Guest management"
+          subtitle={
+            summary
+              ? `${summary.confirmed_headcount} confirmed · ${summary.total_headcount} attending`
+              : "Track RSVPs, plus-ones and dietary needs"
+          }
+          art={<GuestsArt className="h-16 w-16" />}
+          actions={
+            <Link to={`/events/${eventId}`} className="btn-secondary">
+              Back to dashboard
+            </Link>
+          }
+        />
       </div>
 
       {error && <ErrorBanner message={error} />}
@@ -142,7 +160,7 @@ export default function Guests() {
 
       {rows.length === 0 ? (
         <EmptyState
-          icon={<Users className="h-7 w-7" />}
+          icon={<GuestsArt className="h-9 w-9" />}
           title="No guests yet"
           description="Add guests to track RSVPs, plus-ones, and dietary needs. Confirmed headcount feeds your catering estimates."
           action={

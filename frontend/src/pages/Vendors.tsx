@@ -3,6 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import { Plus, Store, Trash2 } from "lucide-react";
 import { useEventDetail } from "../hooks/useEventDetail";
 import { Badge, ErrorBanner, Skeleton } from "../components/ui";
+import ModuleHeader from "../components/ModuleHeader";
+import { eventTheme } from "../theme/eventTheme";
 import { useToast } from "../components/Toast";
 import { api, ApiError } from "../services/api";
 import type { VendorComparison, VendorQuote } from "../types";
@@ -42,6 +44,7 @@ export default function Vendors() {
   if (!data) return null;
 
   const existing = data.vendors ?? [];
+  const theme = eventTheme(data.event.event_type, data.event.style);
 
   function update(i: number, patch: Partial<VendorQuote>) {
     setQuotes((q) => q.map((v, j) => (j === i ? { ...v, ...patch } : v)));
@@ -71,16 +74,19 @@ export default function Vendors() {
 
   return (
     <div className="stagger space-y-6">
-      <div
-        className="flex items-center justify-between"
-        style={{ ["--i" as string]: 0 }}
-      >
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <Store className="h-6 w-6 text-brand-600" /> Vendor quotations
-        </h1>
-        <Link to={`/events/${eventId}`} className="btn-secondary">
-          Back to dashboard
-        </Link>
+      <div style={{ ["--i" as string]: 0 }}>
+        <ModuleHeader
+          theme={theme}
+          eyebrow="Vendor quotations"
+          title="Vendor quotations"
+          subtitle={`${data.event.name} · compare real quotes you collect`}
+          art={<Store className="h-12 w-12" style={{ color: theme.accent }} />}
+          actions={
+            <Link to={`/events/${eventId}`} className="btn-secondary">
+              Back to dashboard
+            </Link>
+          }
+        />
       </div>
 
       <p className="text-sm text-slate-500" style={{ ["--i" as string]: 1 }}>

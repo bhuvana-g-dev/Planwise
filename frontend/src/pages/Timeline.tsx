@@ -3,6 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import { CheckCircle2, Circle, ListChecks, Lock } from "lucide-react";
 import { useEventDetail } from "../hooks/useEventDetail";
 import { Badge, EmptyState, ErrorBanner, Skeleton } from "../components/ui";
+import ModuleHeader from "../components/ModuleHeader";
+import { EmptyPlanArt } from "../components/Illustrations";
+import { eventTheme } from "../theme/eventTheme";
 import { useToast } from "../components/Toast";
 import { api } from "../services/api";
 import type { Task, TaskStatus } from "../types";
@@ -26,11 +29,12 @@ export default function Timeline() {
   if (error) return <ErrorBanner message={error} />;
   if (!data) return null;
   const plan = data.active_plan;
+  const theme = eventTheme(data.event.event_type, data.event.style);
 
   if (!plan)
     return (
       <EmptyState
-        icon={<ListChecks className="h-7 w-7" />}
+        icon={<EmptyPlanArt className="h-12 w-16" />}
         title="No tasks yet"
         description="Generate a plan to see the task timeline and checklist."
         action={
@@ -78,22 +82,24 @@ export default function Timeline() {
 
   return (
     <div className="stagger space-y-6">
-      <div
-        className="flex items-center justify-between"
-        style={{ ["--i" as string]: 0 }}
-      >
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <ListChecks className="h-6 w-6 text-brand-600" /> Timeline &
-          checklist
-        </h1>
-        <div className="flex items-center gap-3">
-          <Badge tone="brand">
-            {doneCount}/{tasks.length} done
-          </Badge>
-          <Link to={`/events/${eventId}`} className="btn-secondary">
-            Back
-          </Link>
-        </div>
+      <div style={{ ["--i" as string]: 0 }}>
+        <ModuleHeader
+          theme={theme}
+          eyebrow="Timeline & checklist"
+          title="Timeline & checklist"
+          subtitle={`${doneCount} of ${tasks.length} tasks done`}
+          art={<ListChecks className="h-12 w-12" style={{ color: theme.accent }} />}
+          actions={
+            <>
+              <Badge tone="brand">
+                {doneCount}/{tasks.length} done
+              </Badge>
+              <Link to={`/events/${eventId}`} className="btn-secondary">
+                Back
+              </Link>
+            </>
+          }
+        />
       </div>
 
       <div
