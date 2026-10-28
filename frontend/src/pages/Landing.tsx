@@ -11,8 +11,7 @@ import {
   GiftSticker,
   StarSticker,
 } from "../components/Stickers";
-import { EventHeroArt } from "../components/Illustrations";
-import { eventTheme } from "../theme/eventTheme";
+import AdaptivePreview from "../components/AdaptivePreview";
 
 export default function Landing() {
   return (
@@ -31,8 +30,9 @@ export default function Landing() {
           </h1>
           <p className="mt-4 max-w-lg text-lg text-slate-600">
             PlanWise AI builds a complete plan for birthdays, weddings and
-            community events — then intelligently replans when your budget,
-            guest count or date changes, showing exactly what moves and why.
+            community events. Just say what changed — "reduce the budget to
+            ₹75,000 but protect catering" — and it replans, showing exactly
+            what moves and why before you approve.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to="/create" className="btn-primary">
@@ -47,34 +47,12 @@ export default function Landing() {
           </p>
         </div>
 
-        <div
-          className="card relative overflow-hidden p-6"
-          style={{ background: eventTheme("birthday").heroGradient }}
-        >
+        <div className="relative">
           <BalloonSticker
-            size={64}
-            className="pointer-events-none absolute -right-3 -top-3 animate-float opacity-80"
+            size={56}
+            className="pointer-events-none absolute -right-3 -top-3 z-10 animate-float opacity-80"
           />
-          <EventHeroArt
-            theme={eventTheme("birthday")}
-            className="mx-auto mb-4 h-28 w-44"
-          />
-          <div className="flex items-baseline justify-between">
-            <h3 className="font-semibold text-slate-900">Birthday · Madurai</h3>
-            <span className="text-sm text-slate-500">50 guests</span>
-          </div>
-          <p className="mb-2 text-[11px] uppercase tracking-wide text-amber-600">
-            Illustrative example — not a saved event
-          </p>
-          <div className="mt-4 space-y-3 text-sm">
-            <Row label="Budget" value="₹30,000" />
-            <Row label="Allocated" value="₹30,000" />
-            <Row label="Remaining" value="₹0" />
-          </div>
-          <div className="mt-4 rounded-xl bg-brand-50 p-4 text-sm text-brand-800">
-            Reduce budget to ₹24,000 → PlanWise proposes targeted cuts to your
-            lowest-priority categories while keeping vegetarian catering intact.
-          </div>
+          <AdaptivePreview />
         </div>
       </section>
 
@@ -101,15 +79,6 @@ export default function Landing() {
           body="Proposals are never auto-applied. Reject leaves your plan untouched; stale approvals are blocked."
         />
       </section>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
     </div>
   );
 }

@@ -8,7 +8,6 @@ import {
   ListChecks,
   MapPin,
   PartyPopper,
-  RefreshCw,
   Sparkles,
   Users,
   Wallet,
@@ -195,7 +194,7 @@ export default function Dashboard() {
         style={{ ["--i" as string]: 2 }}
       >
         <Link to={`/events/${eventId}/adapt`} className="btn-primary">
-          <RefreshCw className="h-4 w-4" /> Adapt plan
+          <Sparkles className="h-4 w-4" /> Adapt plan with AI
         </Link>
         <Link to={`/events/${eventId}/budget`} className="btn-secondary">
           <Wallet className="h-4 w-4" /> Budget
