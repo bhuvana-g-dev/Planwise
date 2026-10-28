@@ -101,6 +101,24 @@ def replan(event_id: str, req: ReplanRequest, owner=Depends(get_current_owner)):
         _handle(exc)
 
 
+class InterpretReplanPayload(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000)
+
+
+@router.post("/events/{event_id}/replans/interpret")
+def interpret_replan(event_id: str, payload: InterpretReplanPayload,
+                     owner=Depends(get_current_owner)):
+    """Interpret a natural-language change request into a validated proposal.
+
+    Gemini extracts intent; the deterministic engine computes and validates.
+    Nothing is persisted — the caller approves via the existing approve route.
+    """
+    try:
+        return event_service.interpret_replan(event_id, payload.text, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
 class ApprovePayload(BaseModel):
     proposed_plan: dict
     base_version: int = Field(..., ge=1)

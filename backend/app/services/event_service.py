@@ -128,6 +128,55 @@ def replan(event_id: str, req: ReplanRequest, owner_id: Optional[str]) -> Replan
     return result
 
 
+def interpret_replan(event_id: str, text: str, owner_id: Optional[str]) -> dict:
+    """Interpret a natural-language change request into a validated proposal.
+
+    Gemini interprets intent only; the deterministic change engine computes and
+    the budget service validates, exactly as the structured endpoint does. The
+    result is never persisted here — it is a proposal for the user to approve.
+
+    Returns a dict with:
+      status: "interpreted" | "needs_clarification" | "unavailable"
+      source: "gemini" | "unavailable"  (how the intent was produced)
+      understood / message / reasons: human-facing explanation
+      replan_request: the structured request we derived (when interpreted)
+      result: the ReplanResult (report + proposed_plan) when interpreted
+    """
+    from app.services import nl_replan
+
+    event_dict = get_event(event_id, owner_id)  # ownership enforced here
+    event = Event.model_validate(event_dict)
+
+    active = get_repository().get_active_plan(event_id)
+    if active is None:
+        raise NotFound("no active plan to replan")
+
+    interp = nl_replan.interpret(event, text)
+    payload = interp.to_dict()
+
+    if interp.status != "interpreted" or interp.replan_request is None:
+        payload["result"] = None
+        return payload
+
+    # Run the SAME validated path the structured endpoint uses.
+    try:
+        result = replan(event_id, interp.replan_request, owner_id)
+    except ValueError as exc:
+        # A supported change_type that still lacks a required value: convert to
+        # a clarification rather than a hard error.
+        return {
+            "status": "needs_clarification",
+            "source": interp.source,
+            "replan_request": payload.get("replan_request"),
+            "understood": interp.understood,
+            "message": str(exc),
+            "reasons": [],
+            "result": None,
+        }
+    payload["result"] = result.model_dump(mode="json")
+    return payload
+
+
 def approve_plan(event_id: str, proposed_plan: dict, base_version: int,
                  owner_id: Optional[str]) -> Plan:
     """Approve a proposal, applying optimistic concurrency.

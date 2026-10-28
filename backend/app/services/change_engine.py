@@ -352,6 +352,85 @@ def _handle_preferences(event: Event, current: Plan, req: ReplanRequest) -> Repl
     return ReplanResult(report=report, proposed_plan=proposed.model_dump(mode="json"))
 
 
+# --------------------------------------------------------------------------
+# Hard-constraints change
+# --------------------------------------------------------------------------
+def _handle_hard_constraints(event: Event, current: Plan,
+                             req: ReplanRequest) -> ReplanResult:
+    """Apply a new set of hard constraints to the current plan.
+
+    Hard constraints never change money by themselves. We map each constraint
+    to the expense category it references (by keyword) and mark that expense
+    non-negotiable + tag it with the constraint, so future budget replans will
+    protect it. The total budget is unchanged; feasibility is re-proven by the
+    budget service (a constraint that references a zero/absent category is
+    reported as a violation rather than silently ignored).
+    """
+    new_constraints = [c.strip() for c in (req.new_hard_constraints or [])
+                       if isinstance(c, str) and c.strip()]
+    expenses = _clone_expenses(current.expenses)
+    reasons = ["Updated hard constraints; tagged matching categories as "
+               "non-negotiable. Total budget unchanged."]
+    preserved: list[str] = []
+    violations: list[str] = []
+
+    # Reset constraint tags that are no longer declared, so stale protections
+    # don't linger.
+    for e in expenses:
+        if e.satisfies_constraint and e.satisfies_constraint not in new_constraints:
+            e.satisfies_constraint = None
+            e.negotiable = True
+
+    for hc in new_constraints:
+        low = hc.lower()
+        matched = False
+        for e in expenses:
+            if e.category.lower() in low:
+                e.negotiable = False
+                e.satisfies_constraint = hc
+                matched = True
+        if matched:
+            preserved.append(hc)
+        else:
+            # Keep the constraint on record but flag that no expense maps to it.
+            violations.append(
+                f"No budget category maps to the constraint '{hc}'. It will be "
+                "tracked but cannot protect a specific expense yet."
+            )
+
+    summary = budget_service.summarize(current.budget.budget_paise, expenses)
+    deltas = _expense_deltas(current.expenses, expenses)
+    affected = sorted({d.category for d in deltas if d.kind != "unchanged"})
+
+    # Feasible as long as the arithmetic holds; unmapped constraints are
+    # surfaced as soft violations (warnings), not hard infeasibility.
+    feasible = summary.within_budget
+    proposed = _new_plan_from(
+        current, expenses, current.budget.budget_paise, current.tasks,
+        change_summary="Hard constraints updated",
+    ) if feasible else None
+
+    report = ChangeReport(
+        change_type=ChangeType.hard_constraints,
+        previous_value=list(event.hard_constraints),
+        new_value=new_constraints,
+        feasible=feasible,
+        affected_categories=affected,
+        expense_deltas=deltas,
+        preserved_constraints=preserved,
+        constraint_violations=violations,
+        trade_offs=[],
+        reasons=reasons,
+        previous_budget_paise=current.budget.budget_paise,
+        proposed_allocated_paise=summary.allocated_paise,
+        proposed_remaining_paise=summary.remaining_paise,
+    )
+    return ReplanResult(
+        report=report,
+        proposed_plan=proposed.model_dump(mode="json") if proposed else None,
+    )
+
+
 def replan(event: Event, current: Plan, req: ReplanRequest) -> ReplanResult:
     """Entry point: dispatch to the right handler by change type."""
     if req.change_type == ChangeType.budget:
@@ -368,4 +447,6 @@ def replan(event: Event, current: Plan, req: ReplanRequest) -> ReplanResult:
         return _handle_date(event, current, req)
     if req.change_type == ChangeType.preferences:
         return _handle_preferences(event, current, req)
+    if req.change_type == ChangeType.hard_constraints:
+        return _handle_hard_constraints(event, current, req)
     raise ValueError(f"Unsupported change type: {req.change_type}")
