@@ -1,14 +1,37 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarDays,
+  Check,
+  Loader2,
+  MapPin,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { api, ApiError } from "../services/api";
 import type { EventCreate, EventType, Preference } from "../types";
 import { ErrorBanner } from "../components/ui";
-import { classNames } from "../utils/format";
+import EventHero from "../components/EventHero";
+import { eventTheme } from "../theme/eventTheme";
+import { formatINR, classNames } from "../utils/format";
 
 type Errors = Partial<Record<string, string>>;
 
 const today = new Date().toISOString().slice(0, 10);
+
+// Only the three backend-supported event types are selectable (the API's
+// EventType enum). Each gets an illustrated card.
+const TYPE_CARDS: { value: EventType; title: string; blurb: string }[] = [
+  { value: "birthday", title: "Birthday", blurb: "Cakes, balloons & fun" },
+  { value: "wedding", title: "Wedding", blurb: "Elegant & romantic" },
+  {
+    value: "community",
+    title: "Community",
+    blurb: "Gatherings & festivals",
+  },
+];
 
 const EMPTY: EventCreate = {
   name: "",
@@ -42,6 +65,8 @@ const DEMO: EventCreate = {
   flexible_choices: ["decorations", "activities"],
 };
 
+const STEP_LABELS = ["Basics", "Budget & details", "Priorities", "Review"];
+
 export default function CreateEvent() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -49,6 +74,8 @@ export default function CreateEvent() {
   const [errors, setErrors] = useState<Errors>({});
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  const theme = eventTheme(form.event_type, form.style);
 
   const set = <K extends keyof EventCreate>(key: K, value: EventCreate[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -73,7 +100,8 @@ export default function CreateEvent() {
   function next() {
     const e = validateStep(step);
     setErrors(e);
-    if (Object.keys(e).length === 0) setStep((s) => Math.min(s + 1, 2));
+    if (Object.keys(e).length === 0)
+      setStep((s) => Math.min(s + 1, STEP_LABELS.length - 1));
   }
 
   async function submit() {
@@ -86,9 +114,10 @@ export default function CreateEvent() {
     setSubmitting(true);
     setApiError(null);
     try {
+      // Unchanged payload / flow: create event, then generate the first plan,
+      // then land on the real dashboard.
       const created = await api.createEvent(form);
-      const plan = await api.generatePlan(created.id).catch(() => null);
-      void plan;
+      await api.generatePlan(created.id).catch(() => null);
       navigate(`/events/${created.id}`);
     } catch (err) {
       setApiError(err instanceof ApiError ? err.message : "Could not create event");
@@ -97,7 +126,7 @@ export default function CreateEvent() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Create an event</h1>
         <button
@@ -117,145 +146,209 @@ export default function CreateEvent() {
         </div>
       )}
 
-      <div className="card mt-6 p-6">
-        {step === 0 && (
-          <div className="space-y-4">
-            <Field label="Event name" error={errors.name}>
-              <input
-                className="input"
-                value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-                placeholder="e.g. Aarav's 10th Birthday"
-              />
-            </Field>
-            <Field label="Event type">
-              <div className="grid grid-cols-3 gap-2">
-                {(["birthday", "wedding", "community"] as EventType[]).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => set("event_type", t)}
-                    className={classNames(
-                      "rounded-xl border px-3 py-2 text-sm font-medium capitalize",
-                      form.event_type === t
-                        ? "border-brand-500 bg-brand-50 text-brand-700"
-                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                    )}
-                  >
-                    {t}
-                  </button>
-                ))}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        {/* ── Form column ── */}
+        <div>
+          {/* key={step} restarts the entrance animation on each step */}
+          <div key={step} className="card animate-fade-up p-6">
+            {step === 0 && (
+              <div className="space-y-5">
+                <Field label="Event name" error={errors.name}>
+                  <input
+                    className="input"
+                    value={form.name}
+                    onChange={(e) => set("name", e.target.value)}
+                    placeholder="e.g. Aarav's 10th Birthday"
+                  />
+                </Field>
+
+                <div>
+                  <label className="label">Event type</label>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {TYPE_CARDS.map((t) => {
+                      const th = eventTheme(t.value);
+                      const active = form.event_type === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => set("event_type", t.value)}
+                          aria-pressed={active}
+                          className={classNames(
+                            "group relative overflow-hidden rounded-2xl border p-3 text-left transition",
+                            active
+                              ? "border-brand-500 shadow-lift"
+                              : "border-sand-300 hover:border-brand-300 hover:shadow-card"
+                          )}
+                          style={active ? { background: th.heroGradient } : undefined}
+                        >
+                          <EventHeroArtMini theme={th} />
+                          <p className="mt-1 font-semibold text-slate-900">
+                            {t.title}
+                          </p>
+                          <p className="text-xs text-slate-500">{t.blurb}</p>
+                          {active && (
+                            <span className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-white">
+                              <Check className="h-3 w-3" />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Event date" error={errors.event_date}>
+                    <input
+                      type="date"
+                      className="input"
+                      min={today}
+                      value={form.event_date}
+                      onChange={(e) => set("event_date", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Location" error={errors.location}>
+                    <input
+                      className="input"
+                      value={form.location}
+                      onChange={(e) => set("location", e.target.value)}
+                      placeholder="City, State"
+                    />
+                  </Field>
+                </div>
               </div>
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Event date" error={errors.event_date}>
-                <input
-                  type="date"
-                  className="input"
-                  min={today}
-                  value={form.event_date}
-                  onChange={(e) => set("event_date", e.target.value)}
-                />
-              </Field>
-              <Field label="Location" error={errors.location}>
-                <input
-                  className="input"
-                  value={form.location}
-                  onChange={(e) => set("location", e.target.value)}
-                  placeholder="City, State"
-                />
-              </Field>
-            </div>
-          </div>
-        )}
+            )}
 
-        {step === 1 && (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Estimated guests" error={errors.guest_count}>
-                <input
-                  type="number"
-                  min={1}
-                  className="input"
-                  value={form.guest_count}
-                  onChange={(e) => set("guest_count", Number(e.target.value))}
-                />
-              </Field>
-              <Field label="Total budget (₹)" error={errors.budget_inr}>
-                <input
-                  type="number"
-                  min={1}
-                  className="input"
-                  value={form.budget_inr}
-                  onChange={(e) => set("budget_inr", Number(e.target.value))}
-                />
-              </Field>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Theme">
-                <input
-                  className="input"
-                  value={form.theme}
-                  onChange={(e) => set("theme", e.target.value)}
-                  placeholder="e.g. Jungle"
-                />
-              </Field>
-              <Field label="Style">
-                <input
-                  className="input"
-                  value={form.style}
-                  onChange={(e) => set("style", e.target.value)}
-                  placeholder="e.g. Simple outdoor celebration"
-                />
-              </Field>
-            </div>
-            <Field label="Dietary requirements (comma separated)">
-              <input
-                className="input"
-                value={(form.dietary_requirements ?? []).join(", ")}
-                onChange={(e) =>
-                  set("dietary_requirements", splitList(e.target.value))
-                }
-                placeholder="e.g. Vegetarian food"
-              />
-            </Field>
-            <Field label="Accessibility requirements (comma separated)">
-              <input
-                className="input"
-                value={(form.accessibility_requirements ?? []).join(", ")}
-                onChange={(e) =>
-                  set("accessibility_requirements", splitList(e.target.value))
-                }
-                placeholder="e.g. Wheelchair access"
-              />
-            </Field>
-          </div>
-        )}
+            {step === 1 && (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Estimated guests" error={errors.guest_count}>
+                    <input
+                      type="number"
+                      min={1}
+                      className="input"
+                      value={form.guest_count}
+                      onChange={(e) => set("guest_count", Number(e.target.value))}
+                    />
+                  </Field>
+                  <Field label="Total budget (₹)" error={errors.budget_inr}>
+                    <input
+                      type="number"
+                      min={1}
+                      className="input"
+                      value={form.budget_inr}
+                      onChange={(e) => set("budget_inr", Number(e.target.value))}
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Theme">
+                    <input
+                      className="input"
+                      value={form.theme}
+                      onChange={(e) => set("theme", e.target.value)}
+                      placeholder="e.g. Jungle"
+                    />
+                  </Field>
+                  <Field label="Style">
+                    <input
+                      className="input"
+                      value={form.style}
+                      onChange={(e) => set("style", e.target.value)}
+                      placeholder="e.g. Simple outdoor celebration"
+                    />
+                  </Field>
+                </div>
+                <Field label="Dietary requirements (comma separated)">
+                  <input
+                    className="input"
+                    value={(form.dietary_requirements ?? []).join(", ")}
+                    onChange={(e) =>
+                      set("dietary_requirements", splitList(e.target.value))
+                    }
+                    placeholder="e.g. Vegetarian food"
+                  />
+                </Field>
+                <Field label="Accessibility requirements (comma separated)">
+                  <input
+                    className="input"
+                    value={(form.accessibility_requirements ?? []).join(", ")}
+                    onChange={(e) =>
+                      set("accessibility_requirements", splitList(e.target.value))
+                    }
+                    placeholder="e.g. Wheelchair access"
+                  />
+                </Field>
+              </div>
+            )}
 
-        {step === 2 && (
-          <div className="space-y-5">
-            <PreferenceEditor
-              value={form.preferences ?? []}
-              onChange={(p) => set("preferences", p)}
-            />
-            <Field label="Hard constraints — must never be violated (one per line)">
-              <textarea
-                className="input min-h-[80px]"
-                value={(form.hard_constraints ?? []).join("\n")}
-                onChange={(e) => set("hard_constraints", splitLines(e.target.value))}
-                placeholder="e.g. Vegetarian catering only"
-              />
-            </Field>
-            <Field label="Flexible choices — may change during replanning (one per line)">
-              <textarea
-                className="input min-h-[80px]"
-                value={(form.flexible_choices ?? []).join("\n")}
-                onChange={(e) => set("flexible_choices", splitLines(e.target.value))}
-                placeholder="e.g. decorations"
-              />
-            </Field>
+            {step === 2 && (
+              <div className="space-y-5">
+                <PreferenceEditor
+                  value={form.preferences ?? []}
+                  onChange={(p) => set("preferences", p)}
+                />
+                <Field label="Hard constraints — must never be violated (one per line)">
+                  <textarea
+                    className="input min-h-[80px]"
+                    value={(form.hard_constraints ?? []).join("\n")}
+                    onChange={(e) =>
+                      set("hard_constraints", splitLines(e.target.value))
+                    }
+                    placeholder="e.g. Vegetarian catering only"
+                  />
+                </Field>
+                <Field label="Flexible choices — may change during replanning (one per line)">
+                  <textarea
+                    className="input min-h-[80px]"
+                    value={(form.flexible_choices ?? []).join("\n")}
+                    onChange={(e) =>
+                      set("flexible_choices", splitLines(e.target.value))
+                    }
+                    placeholder="e.g. decorations"
+                  />
+                </Field>
+              </div>
+            )}
+
+            {step === 3 && <ReviewStep form={form} />}
           </div>
-        )}
+        </div>
+
+        {/* ── Live themed preview ── */}
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <EventHero theme={theme} compact>
+            <h2 className="truncate text-xl font-bold text-slate-900">
+              {form.name || "Your event name"}
+            </h2>
+            <p className="mt-1 text-sm capitalize text-slate-600">
+              {theme.label}
+              {form.style ? ` · ${form.style}` : ""}
+            </p>
+            <ul className="mt-4 space-y-1.5 text-sm text-slate-600">
+              <li className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-brand-500" />
+                {form.event_date || "Pick a date"}
+              </li>
+              <li className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-brand-500" />
+                {form.location || "Add a location"}
+              </li>
+              <li className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-brand-500" />
+                {form.guest_count} guests
+              </li>
+              <li className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-brand-500" />
+                {formatINR((form.budget_inr || 0) * 100)}
+              </li>
+            </ul>
+            <p className="mt-3 text-[11px] text-slate-400">
+              Live preview — updates as you fill the form.
+            </p>
+          </EventHero>
+        </div>
       </div>
 
       <div className="mt-6 flex items-center justify-between">
@@ -266,7 +359,7 @@ export default function CreateEvent() {
         >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
-        {step < 2 ? (
+        {step < STEP_LABELS.length - 1 ? (
           <button className="btn-primary" onClick={next}>
             Continue <ArrowRight className="h-4 w-4" />
           </button>
@@ -274,7 +367,8 @@ export default function CreateEvent() {
           <button className="btn-primary" onClick={submit} disabled={submitting}>
             {submitting ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Generating plan…
+                <Loader2 className="h-4 w-4 animate-spin" /> Creating &
+                generating plan…
               </>
             ) : (
               <>
@@ -288,6 +382,69 @@ export default function CreateEvent() {
   );
 }
 
+function EventHeroArtMini({ theme }: { theme: ReturnType<typeof eventTheme> }) {
+  // Tiny inline motif preview inside each type card.
+  return (
+    <div
+      className="flex h-14 w-full items-center justify-center rounded-xl"
+      style={{ background: theme.soft }}
+    >
+      <span
+        className="h-6 w-6 rounded-full"
+        style={{ background: theme.accent }}
+        aria-hidden
+      />
+      <span
+        className="-ml-2 h-6 w-6 rounded-full"
+        style={{ background: theme.accent2 }}
+        aria-hidden
+      />
+    </div>
+  );
+}
+
+function ReviewStep({ form }: { form: EventCreate }) {
+  const rows: [string, string][] = [
+    ["Name", form.name || "—"],
+    ["Type", form.event_type],
+    ["Date", form.event_date || "—"],
+    ["Location", form.location || "—"],
+    ["Guests", String(form.guest_count)],
+    ["Budget", formatINR((form.budget_inr || 0) * 100)],
+    ["Theme", form.theme || "—"],
+    ["Style", form.style || "—"],
+    ["Dietary", (form.dietary_requirements ?? []).join(", ") || "—"],
+    ["Accessibility", (form.accessibility_requirements ?? []).join(", ") || "—"],
+    [
+      "Priorities",
+      (form.preferences ?? [])
+        .filter((p) => p.label.trim())
+        .map((p) => `${p.label} (#${p.rank})`)
+        .join(", ") || "—",
+    ],
+    ["Hard constraints", (form.hard_constraints ?? []).join(", ") || "—"],
+    ["Flexible choices", (form.flexible_choices ?? []).join(", ") || "—"],
+  ];
+  return (
+    <div>
+      <h3 className="mb-1 font-display text-lg font-semibold text-slate-900">
+        Review your event
+      </h3>
+      <p className="mb-4 text-sm text-slate-500">
+        Confirm the details — you can go back to edit anything.
+      </p>
+      <dl className="divide-y divide-sand-200 rounded-xl border border-sand-200">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex gap-4 px-4 py-2.5 text-sm">
+            <dt className="w-36 shrink-0 text-slate-500">{k}</dt>
+            <dd className="font-medium capitalize text-slate-800">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function splitList(v: string): string[] {
   return v.split(",").map((s) => s.trim()).filter(Boolean);
 }
@@ -296,29 +453,38 @@ function splitLines(v: string): string[] {
 }
 
 function Stepper({ step }: { step: number }) {
-  const labels = ["Basics", "Budget & details", "Priorities"];
   return (
     <ol className="flex items-center gap-2">
-      {labels.map((l, i) => (
+      {STEP_LABELS.map((l, i) => (
         <li key={l} className="flex flex-1 items-center gap-2">
           <span
             className={classNames(
-              "grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold",
-              i <= step ? "bg-brand-600 text-white" : "bg-slate-200 text-slate-500"
+              "grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold transition",
+              i < step
+                ? "bg-brand-600 text-white"
+                : i === step
+                ? "bg-brand-600 text-white ring-4 ring-brand-100"
+                : "bg-sand-200 text-slate-500"
             )}
           >
-            {i + 1}
+            {i < step ? <Check className="h-3.5 w-3.5" /> : i + 1}
           </span>
           <span
             className={classNames(
-              "text-sm",
+              "hidden text-sm sm:inline",
               i <= step ? "font-medium text-slate-900" : "text-slate-400"
             )}
           >
             {l}
           </span>
-          {i < labels.length - 1 && (
-            <span className="h-px flex-1 bg-slate-200" aria-hidden />
+          {i < STEP_LABELS.length - 1 && (
+            <span
+              className={classNames(
+                "h-px flex-1 transition",
+                i < step ? "bg-brand-400" : "bg-sand-300"
+              )}
+              aria-hidden
+            />
           )}
         </li>
       ))}
