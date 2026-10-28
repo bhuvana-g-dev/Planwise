@@ -115,6 +115,9 @@ export default function Dashboard() {
                 {event.name}
               </h1>
               <Badge tone="brand">{event.event_type}</Badge>
+              {theme.styleLabel && (
+                <Badge tone="slate">{theme.styleLabel}</Badge>
+              )}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
               <span className="flex items-center gap-1.5">

@@ -14,7 +14,7 @@ import { api, ApiError } from "../services/api";
 import type { EventCreate, EventType, Preference } from "../types";
 import { ErrorBanner } from "../components/ui";
 import EventHero from "../components/EventHero";
-import { eventTheme } from "../theme/eventTheme";
+import { eventTheme, STYLE_OPTIONS } from "../theme/eventTheme";
 import { formatINR, classNames } from "../utils/format";
 
 type Errors = Partial<Record<string, string>>;
@@ -242,24 +242,19 @@ export default function CreateEvent() {
                     />
                   </Field>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Theme">
-                    <input
-                      className="input"
-                      value={form.theme}
-                      onChange={(e) => set("theme", e.target.value)}
-                      placeholder="e.g. Jungle"
-                    />
-                  </Field>
-                  <Field label="Style">
-                    <input
-                      className="input"
-                      value={form.style}
-                      onChange={(e) => set("style", e.target.value)}
-                      placeholder="e.g. Simple outdoor celebration"
-                    />
-                  </Field>
-                </div>
+                <Field label="Theme">
+                  <input
+                    className="input"
+                    value={form.theme}
+                    onChange={(e) => set("theme", e.target.value)}
+                    placeholder="e.g. Jungle"
+                  />
+                </Field>
+                <StylePicker
+                  eventType={form.event_type}
+                  value={form.style ?? ""}
+                  onChange={(v) => set("style", v)}
+                />
                 <Field label="Dietary requirements (comma separated)">
                   <input
                     className="input"
@@ -318,13 +313,18 @@ export default function CreateEvent() {
 
         {/* ── Live themed preview ── */}
         <div className="lg:sticky lg:top-24 lg:self-start">
+          {/* key on type+style so the preview re-animates when the look changes */}
+          <div
+            key={`${theme.key}-${theme.styleKey}`}
+            className="animate-fade-up transition-all duration-300"
+          >
           <EventHero theme={theme} compact>
             <h2 className="truncate text-xl font-bold text-slate-900">
               {form.name || "Your event name"}
             </h2>
             <p className="mt-1 text-sm capitalize text-slate-600">
               {theme.label}
-              {form.style ? ` · ${form.style}` : ""}
+              {theme.styleLabel ? ` · ${theme.styleLabel}` : ""}
             </p>
             <ul className="mt-4 space-y-1.5 text-sm text-slate-600">
               <li className="flex items-center gap-2">
@@ -348,6 +348,7 @@ export default function CreateEvent() {
               Live preview — updates as you fill the form.
             </p>
           </EventHero>
+          </div>
         </div>
       </div>
 
@@ -386,18 +387,78 @@ function EventHeroArtMini({ theme }: { theme: ReturnType<typeof eventTheme> }) {
   // Tiny inline motif preview inside each type card.
   return (
     <div
-      className="flex h-14 w-full items-center justify-center rounded-xl"
+      className="flex h-14 w-full items-center justify-center rounded-xl transition-colors duration-300"
       style={{ background: theme.soft }}
     >
       <span
-        className="h-6 w-6 rounded-full"
+        className="h-6 w-6 rounded-full transition-colors duration-300"
         style={{ background: theme.accent }}
         aria-hidden
       />
       <span
-        className="-ml-2 h-6 w-6 rounded-full"
+        className="-ml-2 h-6 w-6 rounded-full transition-colors duration-300"
         style={{ background: theme.accent2 }}
         aria-hidden
+      />
+      <span
+        className="-ml-2 h-6 w-6 rounded-full transition-colors duration-300"
+        style={{ background: theme.motifAccent }}
+        aria-hidden
+      />
+    </div>
+  );
+}
+
+// Style preset chips for the chosen event type. The stored value is the preset
+// label (a plain string the backend accepts). Selecting the active chip again
+// clears it (back to the base/classic look). A free-text fallback keeps any
+// custom style the user types — the resolver matches it to the closest preset.
+function StylePicker({
+  eventType,
+  value,
+  onChange,
+}: {
+  eventType: EventType;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const options = STYLE_OPTIONS[eventType] ?? [];
+  const activeByLabel = options.find(
+    (o) => o.label.toLowerCase() === value.trim().toLowerCase()
+  );
+  return (
+    <div>
+      <label className="label">Style</label>
+      <p className="mb-2 text-xs text-slate-500">
+        Pick a style to tailor the colours, motifs and preview — or type your
+        own below.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => {
+          const active = activeByLabel?.key === o.key;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(active ? "" : o.label)}
+              className={classNames(
+                "rounded-full border px-3 py-1.5 text-sm font-medium transition",
+                active
+                  ? "border-brand-500 bg-brand-50 text-brand-700 shadow-sm"
+                  : "border-sand-300 text-slate-600 hover:border-brand-300 hover:bg-sand-50"
+              )}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+      <input
+        className="input mt-2"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="e.g. Simple outdoor celebration"
       />
     </div>
   );

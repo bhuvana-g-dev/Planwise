@@ -35,17 +35,21 @@ function frame(className?: string) {
 function WeddingScene({ theme, className }: HeroProps) {
   return (
     <svg {...frame(className)}>
+      {/* style-aware decorative sparkles */}
+      <circle cx="46" cy="34" r="2.5" fill={theme.motifAccent} opacity="0.6" />
+      <circle cx="158" cy="40" r="2" fill={theme.motifAccent} opacity="0.5" />
+      <circle cx="100" cy="26" r="2" fill={theme.accent2} opacity="0.5" />
       <circle cx="82" cy="78" r="26" fill="none" stroke={theme.accent} strokeWidth="5" />
       <circle cx="116" cy="78" r="26" fill="none" stroke={theme.accent2} strokeWidth="5" />
-      <path d="M70 46l6 8 6-8z" fill="#fcd34d" />
-      <path d="M116 44l5 7 5-7z" fill="#fcd34d" />
+      <path d="M70 46l6 8 6-8z" fill={theme.motifAccent} />
+      <path d="M116 44l5 7 5-7z" fill={theme.motifAccent} />
       {/* floral sprigs */}
       <path d="M30 110c14-6 22-16 24-30" fill="none" stroke={theme.accent} strokeWidth="2" strokeLinecap="round" />
       <circle cx="30" cy="110" r="4" fill={theme.accent2} />
-      <circle cx="40" cy="98" r="3" fill={theme.accent} />
+      <circle cx="40" cy="98" r="3" fill={theme.motifAccent} />
       <path d="M170 110c-14-6-22-16-24-30" fill="none" stroke={theme.accent} strokeWidth="2" strokeLinecap="round" />
       <circle cx="170" cy="110" r="4" fill={theme.accent2} />
-      <circle cx="160" cy="98" r="3" fill={theme.accent} />
+      <circle cx="160" cy="98" r="3" fill={theme.motifAccent} />
     </svg>
   );
 }
@@ -53,16 +57,21 @@ function WeddingScene({ theme, className }: HeroProps) {
 function BirthdayScene({ theme, className }: HeroProps) {
   return (
     <svg {...frame(className)}>
+      {/* confetti — tinted by the resolved style accent */}
+      <circle cx="40" cy="30" r="2.5" fill={theme.motifAccent} opacity="0.7" />
+      <circle cx="160" cy="34" r="2.5" fill={theme.accent2} opacity="0.7" />
+      <rect x="52" y="20" width="4" height="4" rx="1" fill={theme.motifAccent} opacity="0.6" />
+      <rect x="150" y="18" width="4" height="4" rx="1" fill={theme.accent} opacity="0.6" />
       {/* balloons */}
       <ellipse cx="70" cy="46" rx="16" ry="20" fill={theme.accent} />
       <ellipse cx="100" cy="38" rx="16" ry="20" fill={theme.accent2} />
-      <ellipse cx="130" cy="48" rx="16" ry="20" fill="#fbbf24" />
+      <ellipse cx="130" cy="48" rx="16" ry="20" fill={theme.motifAccent} />
       <path d="M70 66c0 8 2 10 6 16M100 58c0 8-2 10-6 16M130 68c0 8 2 8-4 14" stroke="#b45309" strokeWidth="1.5" fill="none" strokeLinecap="round" />
       {/* cake */}
-      <rect x="78" y="96" width="44" height="26" rx="4" fill="#f9a8d4" />
+      <rect x="78" y="96" width="44" height="26" rx="4" fill={theme.soft} />
       <rect x="78" y="96" width="44" height="9" fill={theme.accent} />
       <path d="M100 82v10" stroke="#b45309" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="100" cy="80" r="3" fill="#fbbf24" />
+      <circle cx="100" cy="80" r="3" fill={theme.motifAccent} />
     </svg>
   );
 }
@@ -71,15 +80,19 @@ function CommunityScene({ theme, className }: HeroProps) {
   const people = [
     { x: 60, c: theme.accent },
     { x: 90, c: theme.accent2 },
-    { x: 120, c: "#fbbf24" },
+    { x: 120, c: theme.motifAccent },
     { x: 150, c: theme.accent },
   ];
   return (
     <svg {...frame(className)}>
-      {/* bunting */}
+      {/* bunting — alternating base + style accent */}
       <path d="M20 40q90 30 160 0" fill="none" stroke={theme.accent2} strokeWidth="2" />
       {[30, 60, 90, 120, 150, 170].map((x, i) => (
-        <path key={i} d={`M${x} 44l6 10 6-10z`} fill={i % 2 ? theme.accent : "#fbbf24"} />
+        <path
+          key={i}
+          d={`M${x} 44l6 10 6-10z`}
+          fill={i % 2 ? theme.accent : theme.motifAccent}
+        />
       ))}
       {/* people */}
       {people.map((p, i) => (
@@ -97,7 +110,7 @@ function SparkleScene({ theme, className }: HeroProps) {
     <svg {...frame(className)}>
       <path d="M100 40c3 22 10 30 32 33-22 3-29 11-32 33-3-22-10-30-32-33 22-3 29-11 32-33z" fill={theme.accent} opacity="0.9" />
       <path d="M50 54c1 8 4 11 12 12-8 1-11 4-12 12-1-8-4-11-12-12 8-1 11-4 12-12z" fill={theme.accent2} />
-      <path d="M152 92c1 6 3 8 9 9-6 1-8 3-9 9-1-6-3-8-9-9 6-1 8-3 9-9z" fill="#fbbf24" />
+      <path d="M152 92c1 6 3 8 9 9-6 1-8 3-9 9-1-6-3-8-9-9 6-1 8-3 9-9z" fill={theme.motifAccent} />
     </svg>
   );
 }

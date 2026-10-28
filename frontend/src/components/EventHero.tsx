@@ -16,7 +16,7 @@ export default function EventHero({
 }) {
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border border-sand-200 shadow-card"
+      className="relative overflow-hidden rounded-2xl border border-sand-200 shadow-card transition-[background] duration-500"
       style={{ background: theme.heroGradient }}
     >
       {/* Decorative scene, non-interactive, hidden on very small screens. */}

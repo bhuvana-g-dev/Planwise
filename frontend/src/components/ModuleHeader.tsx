@@ -33,7 +33,7 @@ export default function ModuleHeader({
 
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border border-sand-200 p-5 shadow-card sm:p-6"
+      className="relative overflow-hidden rounded-2xl border border-sand-200 p-5 shadow-card transition-[background] duration-500 sm:p-6"
       style={{ background }}
     >
       {art && (

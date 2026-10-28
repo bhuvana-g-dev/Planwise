@@ -58,7 +58,13 @@ export default function EventDay() {
                 : "Event-day preparation"}
             </h1>
           </div>
-          <p className="mt-1 text-slate-600">{event.name}</p>
+          <p className="mt-1 text-slate-600">
+            {event.name}
+            {(() => {
+              const sl = eventTheme(event.event_type, event.style).styleLabel;
+              return sl ? ` · ${sl}` : "";
+            })()}
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-600">
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4 text-brand-500" />
