@@ -27,7 +27,9 @@ import BudgetChart from "../components/BudgetChart";
 import { Countdown } from "../components/Countdown";
 import { Confetti } from "../components/Confetti";
 import MilestoneJourney from "../components/MilestoneJourney";
-import { EventTypeSticker, SparkleSticker } from "../components/Stickers";
+import { EventTypeSticker } from "../components/Stickers";
+import EventHero from "../components/EventHero";
+import { eventTheme } from "../theme/eventTheme";
 import { useToast } from "../components/Toast";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -71,6 +73,7 @@ export default function Dashboard() {
   if (!data) return null;
 
   const { event, active_plan: plan, plans } = data;
+  const theme = eventTheme(event.event_type, event.style);
 
   async function generate() {
     if (!eventId) return;
@@ -99,14 +102,8 @@ export default function Dashboard() {
       <Confetti fire={confetti} />
 
       {/* ───────── Hero / command center ───────── */}
-      <section
-        className="card relative overflow-hidden p-6 sm:p-8"
-        style={{ ["--i" as string]: 0 }}
-      >
-        <SparkleSticker
-          size={120}
-          className="pointer-events-none absolute -right-6 -top-6 opacity-20"
-        />
+      <div style={{ ["--i" as string]: 0 }}>
+      <EventHero theme={theme}>
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <p className="text-sm text-slate-500">
@@ -175,7 +172,8 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-      </section>
+      </EventHero>
+      </div>
 
       {/* ───────── Milestone journey ───────── */}
       <section className="card p-6" style={{ ["--i" as string]: 1 }}>

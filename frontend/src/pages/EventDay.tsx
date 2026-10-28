@@ -13,7 +13,8 @@ import {
 import { useEventDetail } from "../hooks/useEventDetail";
 import { Badge, EmptyState, ErrorBanner, Skeleton } from "../components/ui";
 import { Countdown, useCountdown } from "../components/Countdown";
-import { CalendarSticker } from "../components/Stickers";
+import EventHero from "../components/EventHero";
+import { eventTheme } from "../theme/eventTheme";
 import { formatDate } from "../utils/format";
 
 export default function EventDay() {
@@ -44,14 +45,8 @@ export default function EventDay() {
   return (
     <div className="stagger space-y-6">
       {/* Hero */}
-      <section
-        className="card relative overflow-hidden p-6 sm:p-8"
-        style={{ ["--i" as string]: 0 }}
-      >
-        <CalendarSticker
-          size={110}
-          className="pointer-events-none absolute -right-4 -top-4 opacity-20"
-        />
+      <div style={{ ["--i" as string]: 0 }}>
+      <EventHero theme={eventTheme(event.event_type, event.style)} compact>
         <div className="relative">
           <div className="flex items-center gap-2">
             <PartyPopper className="h-5 w-5 text-brand-600" />
@@ -86,7 +81,8 @@ export default function EventDay() {
             </div>
           )}
         </div>
-      </section>
+      </EventHero>
+      </div>
 
       {/* Past event summary */}
       {isPast ? (
@@ -120,7 +116,7 @@ export default function EventDay() {
         </section>
       ) : !plan ? (
         <EmptyState
-          icon={<CalendarSticker size={28} />}
+          icon={<CalendarDays className="h-7 w-7" />}
           title="No day-of schedule yet"
           description="Generate a plan to build your task timeline. Your event-day checklist and schedule are derived from it."
           action={

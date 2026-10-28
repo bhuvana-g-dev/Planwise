@@ -11,6 +11,8 @@ import {
   GiftSticker,
   StarSticker,
 } from "../components/Stickers";
+import { EventHeroArt } from "../components/Illustrations";
+import { eventTheme } from "../theme/eventTheme";
 
 export default function Landing() {
   return (
@@ -45,15 +47,25 @@ export default function Landing() {
           </p>
         </div>
 
-        <div className="card relative overflow-hidden p-6">
+        <div
+          className="card relative overflow-hidden p-6"
+          style={{ background: eventTheme("birthday").heroGradient }}
+        >
           <BalloonSticker
             size={64}
             className="pointer-events-none absolute -right-3 -top-3 animate-float opacity-80"
+          />
+          <EventHeroArt
+            theme={eventTheme("birthday")}
+            className="mx-auto mb-4 h-28 w-44"
           />
           <div className="flex items-baseline justify-between">
             <h3 className="font-semibold text-slate-900">Birthday · Madurai</h3>
             <span className="text-sm text-slate-500">50 guests</span>
           </div>
+          <p className="mb-2 text-[11px] uppercase tracking-wide text-amber-600">
+            Illustrative example — not a saved event
+          </p>
           <div className="mt-4 space-y-3 text-sm">
             <Row label="Budget" value="₹30,000" />
             <Row label="Allocated" value="₹30,000" />
