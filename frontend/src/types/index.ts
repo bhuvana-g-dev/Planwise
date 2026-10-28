@@ -157,6 +157,21 @@ export interface ReplanResult {
   proposed_plan: Plan | null;
 }
 
+/** Result of interpreting a natural-language change request. */
+export interface InterpretReplanResult {
+  // "interpreted" => result is present; "needs_clarification" / "unavailable"
+  // => only the message/understood fields are meaningful.
+  status: "interpreted" | "needs_clarification" | "unavailable";
+  // How the intent was produced: "gemini" when AI interpreted it, or
+  // "unavailable" when the AI path could not run.
+  source: "gemini" | "unavailable";
+  replan_request: ReplanRequest | null;
+  understood: string;
+  message: string;
+  reasons: string[];
+  result: ReplanResult | null;
+}
+
 export interface VendorQuote {
   id?: string;
   vendor_name: string;

@@ -9,6 +9,7 @@ import type {
   GenerateMenuResult,
   Guest,
   GuestSummary,
+  InterpretReplanResult,
   Plan,
   ReplanRequest,
   ReplanResult,
@@ -93,6 +94,12 @@ export const api = {
     request<ReplanResult>(`/api/events/${id}/replans`, {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+
+  interpretReplan: (id: string, text: string) =>
+    request<InterpretReplanResult>(`/api/events/${id}/replans/interpret`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
     }),
 
   approvePlan: (id: string, proposed_plan: Plan, base_version: number) =>

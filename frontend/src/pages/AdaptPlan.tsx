@@ -8,7 +8,9 @@ import {
   Plus,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   TriangleAlert,
+  Wand2,
   X,
 } from "lucide-react";
 import { useEventDetail } from "../hooks/useEventDetail";
@@ -42,6 +44,14 @@ export default function AdaptPlan() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [approving, setApproving] = useState(false);
 
+  // Natural-language Adapt Plan state.
+  const [nlText, setNlText] = useState("");
+  const [interpreting, setInterpreting] = useState(false);
+  const [clarify, setClarify] = useState<string | null>(null);
+  // When a proposal came from an AI interpretation, we show what was understood
+  // and badge the proposal as AI-interpreted (vs the deterministic math).
+  const [aiUnderstood, setAiUnderstood] = useState<string | null>(null);
+
   if (loading)
     return (
       <div className="space-y-6">
@@ -73,6 +83,34 @@ export default function AdaptPlan() {
       />
     );
 
+  async function interpretNl() {
+    if (!eventId || !nlText.trim()) return;
+    setInterpreting(true);
+    setActionError(null);
+    setClarify(null);
+    setResult(null);
+    setAiUnderstood(null);
+    try {
+      const res = await api.interpretReplan(eventId, nlText.trim());
+      if (res.status === "interpreted" && res.result) {
+        setAiUnderstood(res.understood || null);
+        setResult(res.result);
+        if (!res.result.report.feasible) {
+          toast.info("No feasible plan found — see the conflict details below.");
+        }
+      } else {
+        // needs_clarification | unavailable — ask the user, never guess.
+        setClarify(res.message || "Could you rephrase that change request?");
+      }
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : "Could not interpret that request";
+      setActionError(msg);
+      toast.error(msg);
+    } finally {
+      setInterpreting(false);
+    }
+  }
+
   async function propose() {
     if (!eventId) return;
     const req: ReplanRequest = { change_type: changeType };
@@ -83,6 +121,8 @@ export default function AdaptPlan() {
     setRunning(true);
     setActionError(null);
     setResult(null);
+    setAiUnderstood(null);
+    setClarify(null);
     try {
       const res = await api.replan(eventId, req);
       setResult(res);
@@ -146,8 +186,74 @@ export default function AdaptPlan() {
 
       {actionError && <ErrorBanner message={actionError} />}
 
+      {/* ── Natural-language Adapt Plan ── */}
+      <div
+        className="card relative overflow-hidden p-6"
+        style={{ ["--i" as string]: 1, background: theme.heroGradient }}
+      >
+        <div className="relative">
+          <div className="mb-1 flex items-center gap-2">
+            <span
+              className="grid h-8 w-8 place-items-center rounded-xl text-white"
+              style={{ background: theme.accent }}
+            >
+              <Wand2 className="h-4 w-4" />
+            </span>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Describe your change
+            </h2>
+            <Badge tone="plum">AI assisted</Badge>
+          </div>
+          <p className="mb-3 max-w-2xl text-sm text-slate-600">
+            Tell PlanWise what you'd like to change in plain language. The AI only
+            interprets your request — every number is still calculated and
+            validated by the planner, and nothing changes until you approve.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <textarea
+              className="input min-h-[64px] flex-1"
+              placeholder={
+                'e.g. "Reduce my budget to \u20b924,000 but protect catering" ' +
+                'or "Move the event to 20 December 2026"'
+              }
+              value={nlText}
+              onChange={(e) => setNlText(e.target.value)}
+              aria-label="Describe your change in natural language"
+            />
+            <button
+              className="btn-primary sm:self-end"
+              onClick={interpretNl}
+              disabled={interpreting || !nlText.trim()}
+            >
+              {interpreting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Interpreting…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" /> Interpret
+                </>
+              )}
+            </button>
+          </div>
+          {clarify && (
+            <div
+              className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+              role="status"
+            >
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{clarify}</span>
+            </div>
+          )}
+          <p className="mt-2 text-[11px] text-slate-400">
+            Prefer precise control? Use the structured options below — they do
+            exactly the same calculation.
+          </p>
+        </div>
+      </div>
+
       {/* Change controls */}
-      <div className="card p-6" style={{ ["--i" as string]: 1 }}>
+      <div className="card p-6" style={{ ["--i" as string]: 2 }}>
         <div className="mb-4 inline-flex gap-1 rounded-xl border border-sand-300 p-1">
           {(
             [
@@ -224,7 +330,17 @@ export default function AdaptPlan() {
 
       {/* Result */}
       {report && (
-        <div className="stagger space-y-6" style={{ ["--i" as string]: 2 }}>
+        <div className="stagger space-y-6" style={{ ["--i" as string]: 3 }}>
+          {aiUnderstood && (
+            <div className="flex items-start gap-2 rounded-xl border border-plum-100 bg-plum-50 px-4 py-2.5 text-sm text-plum-600">
+              <Wand2 className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                <span className="font-medium">AI interpreted:</span>{" "}
+                {aiUnderstood}. All figures below are calculated and validated by
+                PlanWise — review and approve before anything changes.
+              </span>
+            </div>
+          )}
           {report.feasible ? (
             <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800">
               <ShieldCheck className="h-4 w-4" />
