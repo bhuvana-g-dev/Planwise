@@ -13,7 +13,9 @@ class Settings(BaseSettings):
 
     # AI
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    # Overridden by the GEMINI_MODEL environment variable. "gemini-1.5-flash"
+    # is retired (404); this default was verified live with google-genai.
+    gemini_model: str = "gemini-3.5-flash"
     ai_timeout_seconds: float = 30.0
 
     # CORS

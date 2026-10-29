@@ -1,10 +1,12 @@
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
-pydantic==2.10.3
+pydantic==2.14.1
 pydantic-settings==2.6.1
 python-dotenv==1.0.1
 httpx==0.28.1
-google-generativeai==0.8.3
+# Google GenAI SDK (replaces the deprecated google-generativeai package).
+# Requires pydantic>=2.12.5. Pinned below 3.0.0 per the SDK's own guidance.
+google-genai==2.34.0
 firebase-admin==6.6.0
 
 # dev / test
