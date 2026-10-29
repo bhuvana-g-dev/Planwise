@@ -14,6 +14,7 @@ import { api, ApiError } from "../services/api";
 import type { EventCreate, EventType, Preference } from "../types";
 import { ErrorBanner } from "../components/ui";
 import EventHero from "../components/EventHero";
+import { EventHeroArt } from "../components/Illustrations";
 import { eventTheme, STYLE_OPTIONS } from "../theme/eventTheme";
 import { formatINR, classNames } from "../utils/format";
 
@@ -384,26 +385,17 @@ export default function CreateEvent() {
 }
 
 function EventHeroArtMini({ theme }: { theme: ReturnType<typeof eventTheme> }) {
-  // Tiny inline motif preview inside each type card.
+  // Event-type scene (rings / balloons & cake / people & bunting), reusing the
+  // same illustration as the dashboard hero so the card matches the result.
+  // Decorative only: EventHeroArt is aria-hidden and the card has a text label.
   return (
     <div
-      className="flex h-14 w-full items-center justify-center rounded-xl transition-colors duration-300"
+      className="flex h-20 w-full items-center justify-center overflow-hidden rounded-xl transition-colors duration-300 sm:h-24"
       style={{ background: theme.soft }}
     >
-      <span
-        className="h-6 w-6 rounded-full transition-colors duration-300"
-        style={{ background: theme.accent }}
-        aria-hidden
-      />
-      <span
-        className="-ml-2 h-6 w-6 rounded-full transition-colors duration-300"
-        style={{ background: theme.accent2 }}
-        aria-hidden
-      />
-      <span
-        className="-ml-2 h-6 w-6 rounded-full transition-colors duration-300"
-        style={{ background: theme.motifAccent }}
-        aria-hidden
+      <EventHeroArt
+        theme={theme}
+        className="h-full w-auto max-w-full transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
       />
     </div>
   );
