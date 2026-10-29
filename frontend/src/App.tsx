@@ -18,6 +18,7 @@ const AdaptPlan = lazy(() => import("./pages/AdaptPlan"));
 const Vendors = lazy(() => import("./pages/Vendors"));
 const Guests = lazy(() => import("./pages/Guests"));
 const Catering = lazy(() => import("./pages/Catering"));
+const Caterers = lazy(() => import("./pages/Caterers"));
 const VenueDiscovery = lazy(() => import("./pages/VenueDiscovery"));
 const EventDay = lazy(() => import("./pages/EventDay"));
 
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="vendors" element={<Vendors />} />
             <Route path="guests" element={<Guests />} />
             <Route path="catering" element={<Catering />} />
+            <Route path="caterers" element={<Caterers />} />
             <Route path="venues-discovery" element={<VenueDiscovery />} />
             <Route path="event-day" element={<EventDay />} />
           </Route>

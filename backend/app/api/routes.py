@@ -351,3 +351,158 @@ def recommend_venues(event_id: str, payload: VenueRecommendPayload,
         )
     except Exception as exc:
         _handle(exc)
+
+
+# --------------------------------------------------------------------------
+# Caterers: real discovery, comparison, manual arrangements, booking, budget
+# --------------------------------------------------------------------------
+@router.get("/caterers/search")
+def search_caterers(location: str, radius_km: int = 25, food: str = "both",
+                    include_restaurants: bool = False):
+    """Real providers from OpenStreetMap. Never returns invented data."""
+    from app.services import caterer_search
+    if food not in ("veg", "nonveg", "both"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "food must be veg, nonveg or both")
+    return caterer_search.search(location, radius_km, food, include_restaurants)
+
+
+@router.get("/caterers/{provider_id}")
+def get_caterer_provider(provider_id: str):
+    from app.services import caterer_search
+    provider = caterer_search.get_provider(provider_id)
+    if provider is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND,
+                            "Provider not found — search again to refresh.")
+    return provider.model_dump(mode="json")
+
+
+class CatererCreatePayload(BaseModel):
+    record: dict
+    # Link provider details to this existing record instead of adding a new
+    # one (prevents double-counting the same caterer).
+    link_to_id: Optional[str] = None
+
+
+class FoodPreferencePayload(BaseModel):
+    food_preference: str
+
+
+class SelectCatererPayload(BaseModel):
+    selected: bool = True
+
+
+class ApplyBudgetPayload(BaseModel):
+    base_version: int = Field(..., ge=1)
+    expected_total_paise: Optional[int] = Field(default=None, ge=0)
+
+
+@router.get("/events/{event_id}/caterers")
+def list_caterers(event_id: str, owner=Depends(get_current_owner)):
+    from app.services import caterer_service
+    try:
+        return caterer_service.overview(event_id, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.put("/events/{event_id}/caterers/preferences")
+def set_caterer_preferences(event_id: str, payload: FoodPreferencePayload,
+                            owner=Depends(get_current_owner)):
+    from app.services import caterer_service
+    try:
+        return caterer_service.set_preference(
+            event_id, payload.food_preference, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.post("/events/{event_id}/caterers", status_code=status.HTTP_201_CREATED)
+def create_caterer(event_id: str, payload: CatererCreatePayload,
+                   owner=Depends(get_current_owner)):
+    from pydantic import ValidationError
+
+    from app.models.caterer import CatererInput
+    from app.services import caterer_service
+    try:
+        data = CatererInput.model_validate(payload.record)
+    except ValidationError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            _first_error(exc))
+    try:
+        return caterer_service.create(event_id, data, owner, payload.link_to_id)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.patch("/events/{event_id}/caterers/{caterer_id}")
+def update_caterer(event_id: str, caterer_id: str, patch: dict,
+                   owner=Depends(get_current_owner)):
+    from pydantic import ValidationError
+
+    from app.models.caterer import CatererPatch
+    from app.services import caterer_service
+    try:
+        data = CatererPatch.model_validate(patch)
+        return caterer_service.update(event_id, caterer_id, data, owner)
+    except ValidationError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            _first_error(exc))
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.delete("/events/{event_id}/caterers/{caterer_id}")
+def delete_caterer(event_id: str, caterer_id: str,
+                   owner=Depends(get_current_owner)):
+    from app.services import caterer_service
+    try:
+        return caterer_service.delete(event_id, caterer_id, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.post("/events/{event_id}/caterers/{caterer_id}/select")
+def select_caterer(event_id: str, caterer_id: str,
+                   payload: SelectCatererPayload,
+                   owner=Depends(get_current_owner)):
+    from app.services import caterer_service
+    try:
+        return caterer_service.select(event_id, caterer_id, payload.selected,
+                                      owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.get("/events/{event_id}/caterers/{caterer_id}/budget-preview")
+def caterer_budget_preview(event_id: str, caterer_id: str,
+                           owner=Depends(get_current_owner)):
+    from app.services import caterer_service
+    try:
+        return caterer_service.budget_preview(event_id, caterer_id, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.post("/events/{event_id}/caterers/{caterer_id}/apply-budget")
+def caterer_apply_budget(event_id: str, caterer_id: str,
+                         payload: ApplyBudgetPayload,
+                         owner=Depends(get_current_owner)):
+    from app.services import caterer_service
+    try:
+        return caterer_service.apply_budget(
+            event_id, caterer_id, payload.base_version,
+            payload.expected_total_paise, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+def _first_error(exc) -> str:
+    """Readable message for the first Pydantic validation error."""
+    errs = exc.errors()
+    if not errs:
+        return "Invalid input"
+    e = errs[0]
+    field = ".".join(str(p) for p in e.get("loc", []) if p != "body")
+    msg = str(e.get("msg", "Invalid value")).removeprefix("Value error, ")
+    return f"{field}: {msg}" if field else msg

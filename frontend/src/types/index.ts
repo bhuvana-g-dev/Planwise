@@ -412,3 +412,180 @@ export interface CateringOptimizeResult {
   reasons: string[];
   constraint_violations: string[];
 }
+
+// --------------------------------------------------------------------------
+// Caterers: discovery, comparison, manual arrangements, booking, budget
+// --------------------------------------------------------------------------
+export type FoodType = "veg" | "nonveg" | "both";
+export type CatererMenuType =
+  | "breakfast"
+  | "lunch"
+  | "dinner"
+  | "snacks"
+  | "custom";
+export type BookingStatus = "not_booked" | "requested" | "confirmed" | "cancelled";
+export type PaymentStatus = "unpaid" | "partially_paid" | "paid" | "refunded";
+export type PriceSource = "published" | "estimated" | "quoted" | "quote_needed";
+export type BudgetSync = "not_applied" | "in_sync" | "out_of_date" | "replaced";
+
+export interface MenuCourses {
+  starters: string;
+  mains: string;
+  desserts: string;
+  beverages: string;
+}
+
+/** Create/update payload (rupees). */
+export interface CatererInput {
+  name: string;
+  source?: "manual" | "osm";
+  provider_id?: string | null;
+  kind?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+  lat?: number | null;
+  lng?: number | null;
+  distance_km?: number | null;
+  menu_types?: CatererMenuType[];
+  food_type?: FoodType;
+  cuisines?: string[];
+  menu?: MenuCourses;
+  inclusions?: string[];
+  guest_count?: number | null;
+  price_per_guest_inr?: number;
+  extras_inr?: number;
+  fixed_total_inr?: number | null;
+  fixed_total_reason?: string;
+  advance_paid_inr?: number;
+  price_source?: PriceSource;
+  min_guests?: number | null;
+  max_guests?: number | null;
+  booking_status?: BookingStatus;
+  refunded?: boolean;
+  notes?: string;
+}
+
+export interface RequirementCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+}
+
+/** Stored record + backend-computed totals (paise). */
+export interface CatererView {
+  id: string;
+  name: string;
+  source: "manual" | "osm";
+  provider_id: string | null;
+  kind: string;
+  phone: string;
+  email: string;
+  website: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+  distance_km: number | null;
+  menu_types: CatererMenuType[];
+  food_type: FoodType;
+  cuisines: string[];
+  menu: MenuCourses;
+  inclusions: string[];
+  guest_count: number | null;
+  price_per_guest_paise: number;
+  extras_paise: number;
+  fixed_total_paise: number | null;
+  fixed_total_reason: string;
+  advance_paid_paise: number;
+  price_source: PriceSource;
+  min_guests: number | null;
+  max_guests: number | null;
+  booking_status: BookingStatus;
+  refunded: boolean;
+  notes: string;
+  selected: boolean;
+  applied_total_paise: number | null;
+  applied_plan_version: number | null;
+  created_at: string;
+  updated_at: string;
+  // computed
+  guests_used: number;
+  guests_follow_event: boolean;
+  base_paise: number;
+  computed_total_paise: number;
+  total_paise: number;
+  is_fixed_price: boolean;
+  has_price: boolean;
+  balance_paise: number;
+  overpaid_paise: number;
+  payment_status: PaymentStatus;
+  checks: RequirementCheck[];
+  meets_requirements: boolean;
+  budget_sync: BudgetSync;
+}
+
+export interface CatererOverview {
+  food_preference: FoodType;
+  headcount: { count: number; source: string; planned: number; confirmed: number };
+  event: { name: string; date: string; location: string; event_type: string };
+  records: CatererView[];
+  best_fit_id: string | null;
+  selected_id: string | null;
+  budget: {
+    has_plan: boolean;
+    plan_version: number | null;
+    budget_paise: number | null;
+    allocated_paise: number | null;
+    remaining_paise: number | null;
+    catering_paise: number | null;
+  };
+}
+
+export interface CatererSearchResult {
+  provider_id: string;
+  name: string;
+  kind: "caterer" | "restaurant" | string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+  distance_km: number | null;
+  phone: string;
+  email: string;
+  website: string;
+  cuisines: string[];
+  diet: "pure_veg" | "veg_options" | "non_veg" | "unknown" | string;
+  opening_hours: string;
+  source: string;
+  osm_url: string;
+}
+
+export interface CatererSearchResponse {
+  status: "ok" | "unavailable" | "invalid";
+  results: CatererSearchResult[];
+  message: string;
+  attribution: string;
+  center: { lat: number; lng: number; label: string } | null;
+  radius_km?: number;
+}
+
+export interface CatererBudgetPreview {
+  caterer_id: string;
+  caterer_name: string;
+  total_paise: number;
+  base_version: number;
+  before: {
+    budget_paise: number;
+    catering_paise: number;
+    allocated_paise: number;
+    remaining_paise: number;
+  };
+  after: {
+    budget_paise: number;
+    catering_paise: number;
+    allocated_paise: number;
+    remaining_paise: number;
+    within_budget: boolean;
+  };
+  warnings: string[];
+}

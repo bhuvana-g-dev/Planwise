@@ -90,3 +90,12 @@ class Repository(ABC):
     @abstractmethod
     def save_shortlisted_venues(self, event_id: str,
                                 venues: list[dict]) -> list[dict]: ...
+
+    # --- caterers (discovery picks, manual arrangements, booking state) ---
+    @abstractmethod
+    def get_caterers(self, event_id: str) -> Optional[dict]:
+        """Return {"food_preference": str, "records": [...]} or None."""
+        ...
+
+    @abstractmethod
+    def save_caterers(self, event_id: str, store: dict) -> dict: ...

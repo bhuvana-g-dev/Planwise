@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Store,
   Users,
+  Utensils,
   X,
 } from "lucide-react";
 import { classNames } from "../utils/format";
@@ -54,6 +55,11 @@ function groups(eventId: string): NavGroup[] {
           to: `${base}/catering`,
           label: "Catering & Menu",
           icon: <ChefHat className="h-4 w-4" />,
+        },
+        {
+          to: `${base}/caterers`,
+          label: "Caterers & Booking",
+          icon: <Utensils className="h-4 w-4" />,
         },
         {
           to: `${base}/timeline`,

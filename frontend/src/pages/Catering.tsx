@@ -225,9 +225,14 @@ export default function Catering() {
           )} per guest`}
           art={<CateringArt className="h-16 w-16" />}
           actions={
-            <Link to={`/events/${eventId}`} className="btn-secondary">
-              Back to dashboard
-            </Link>
+            <>
+              <Link to={`/events/${eventId}/caterers`} className="btn-primary">
+                Find & book caterers
+              </Link>
+              <Link to={`/events/${eventId}`} className="btn-secondary">
+                Back to dashboard
+              </Link>
+            </>
           }
         />
       </div>

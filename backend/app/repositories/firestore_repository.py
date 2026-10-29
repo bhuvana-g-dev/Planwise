@@ -156,3 +156,14 @@ class FirestoreRepository(Repository):
         self.db.collection("events").document(event_id) \
             .collection("meta").document("venues").set({"venues": venues})
         return venues
+
+    # ---- caterers ----
+    def get_caterers(self, event_id: str) -> Optional[dict]:
+        doc = self.db.collection("events").document(event_id) \
+            .collection("meta").document("caterers").get()
+        return doc.to_dict().get("store") if doc.exists else None
+
+    def save_caterers(self, event_id: str, store: dict) -> dict:
+        self.db.collection("events").document(event_id) \
+            .collection("meta").document("caterers").set({"store": store})
+        return store
