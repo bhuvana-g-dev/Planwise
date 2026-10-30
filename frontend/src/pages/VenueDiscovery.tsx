@@ -3,24 +3,32 @@ import { Link, useParams } from "react-router-dom";
 import {
   Check,
   Heart,
+  Info,
   List,
   MapPin,
   Search,
   Sparkles,
   Star,
+  Tag,
   Users,
 } from "lucide-react";
 import { api, ApiError } from "../services/api";
 import type {
+  PriceBandsInfo,
   SelectedVenue,
   Venue,
+  VenuePrice,
   VenueQuery,
+  VenueQuote,
+  VenueQuoteInput,
   VenueRecommendation,
   VenueType,
 } from "../types";
 import { Badge, EmptyState, ErrorBanner, Skeleton, Spinner } from "../components/ui";
 import ModuleHeader from "../components/ModuleHeader";
 import { VenueArt } from "../components/Illustrations";
+import VenuePriceTag from "../components/venues/VenuePriceTag";
+import VenueQuoteForm from "../components/venues/VenueQuoteForm";
 import { eventTheme } from "../theme/eventTheme";
 import { useToast } from "../components/Toast";
 import { formatINR, titleCase } from "../utils/format";
@@ -94,12 +102,26 @@ export default function VenueDiscovery() {
   // Amenity filter (P5)
   const [amenityFilter, setAmenityFilter] = useState<string>("");
 
+  // Pricing: resolved price per venue (quote > listed > draft estimate),
+  // this event's quotes, and the draft band table.
+  const [prices, setPrices] = useState<Record<string, VenuePrice>>({});
+  const [quotes, setQuotes] = useState<Record<string, VenueQuote>>({});
+  const [bands, setBands] = useState<PriceBandsInfo | null>(null);
+  const [showBands, setShowBands] = useState(false);
+  const [quoteVenue, setQuoteVenue] = useState<Venue | null>(null);
+  const [quoteSaving, setQuoteSaving] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+
   const runSearch = useCallback(async (q: VenueQuery) => {
     setLoading(true);
     setError(null);
     try {
-      const page = await api.searchVenues(q);
+      // Event-scoped search applies this event's quotes over estimates.
+      const page = eventId
+        ? await api.searchEventVenues(eventId, q)
+        : await api.searchVenues(q);
       setVenues(page.results);
+      setPrices(page.prices ?? {});
       setDisclaimer(page.disclaimer);
       setSourceMode(page.source_mode);
       setTotal(page.total);
@@ -109,12 +131,20 @@ export default function VenueDiscovery() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [eventId]);
 
   useEffect(() => {
     void runSearch(query);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Draft estimate table + this event's saved quotes.
+  useEffect(() => {
+    api.venuePriceBands().then(setBands).catch(() => setBands(null));
+    if (eventId) {
+      api.listVenueQuotes(eventId).then(setQuotes).catch(() => setQuotes({}));
+    }
+  }, [eventId]);
 
   // P1: restore shortlist + the saved selected venue (with authoritative
   // budget comparison) when the page loads / after a refresh.
@@ -236,6 +266,53 @@ export default function VenueDiscovery() {
     }
   }
 
+  // --- Venue quotes: user-entered prices override draft estimates ---
+  async function refreshAfterQuote(venueId: string) {
+    await runSearch(query);
+    if (eventId && selected?.venue.id === venueId) {
+      try {
+        setSelected(await api.selectVenue(eventId, venueId));
+      } catch {
+        /* keep the previous selection view */
+      }
+    }
+  }
+
+  async function saveQuote(q: VenueQuoteInput) {
+    if (!eventId || !quoteVenue) return;
+    const v = quoteVenue;
+    setQuoteSaving(true);
+    setQuoteError(null);
+    try {
+      // Shortlist first so the quoted venue stays findable in event search.
+      if (!inShortlist(v.id)) setShortlist(await api.shortlistVenue(eventId, v));
+      setQuotes(await api.saveVenueQuote(eventId, v.id, q));
+      toast.success(`Quote saved for ${v.name}.`);
+      setQuoteVenue(null);
+      await refreshAfterQuote(v.id);
+    } catch (e) {
+      setQuoteError(e instanceof ApiError ? e.message : "Couldn't save the quote");
+    } finally {
+      setQuoteSaving(false);
+    }
+  }
+
+  async function deleteQuote() {
+    if (!eventId || !quoteVenue) return;
+    const v = quoteVenue;
+    setQuoteSaving(true);
+    try {
+      setQuotes(await api.deleteVenueQuote(eventId, v.id));
+      toast.info(`Quote removed — ${v.name} shows the estimate again.`);
+      setQuoteVenue(null);
+      await refreshAfterQuote(v.id);
+    } catch (e) {
+      setQuoteError(e instanceof ApiError ? e.message : "Couldn't remove the quote");
+    } finally {
+      setQuoteSaving(false);
+    }
+  }
+
   async function recommend() {
     if (!eventId) return;
     setRecBusy(true);
@@ -328,12 +405,40 @@ export default function VenueDiscovery() {
                 </span>
               </div>
               <div className="text-right">
-                {selected.est_price_paise != null ? (
+                {selected.price ? (
+                  <div className="flex flex-col items-end gap-1">
+                    <VenuePriceTag
+                      price={{
+                        ...selected.price,
+                        // A single known price already gets the
+                        // within/over badge below; ranges show their own
+                        // fit against the plan's venue budget.
+                        budget_status:
+                          selected.within_budget != null
+                            ? "unknown"
+                            : selected.price.budget_status,
+                      }}
+                      compact
+                    />
+                    {selected.price.kind !== "quoted" && (
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-brand-700 hover:underline"
+                        onClick={() => {
+                          setQuoteError(null);
+                          setQuoteVenue(selected.venue);
+                        }}
+                      >
+                        Add the real quote
+                      </button>
+                    )}
+                  </div>
+                ) : selected.est_price_paise != null ? (
                   <p className="text-sm text-slate-600">
                     Est. {formatINR(selected.est_price_paise)}
                   </p>
                 ) : (
-                  <p className="text-sm text-slate-400">Price not listed</p>
+                  <p className="text-sm text-slate-400">Price unavailable</p>
                 )}
                 {selected.venue_budget_paise != null &&
                   selected.within_budget != null &&
@@ -426,31 +531,21 @@ export default function VenueDiscovery() {
             }
           />
           <input
-            type="number"
-            min={0}
-            className="input max-w-[140px]"
-            placeholder="Max price ₹"
-            value={query.max_price_inr ?? ""}
-            onChange={(e) =>
-              setQuery({
-                ...query,
-                max_price_inr: e.target.value ? Number(e.target.value) : null,
-              })
-            }
-          />
-          <input
             className="input max-w-[200px]"
             placeholder="Amenities (e.g. parking, ac)"
             value={amenityFilter}
             onChange={(e) => setAmenityFilter(e.target.value)}
           />
           <select
-            className="input max-w-[160px]"
+            className="input max-w-[190px]"
             value={query.sort}
             onChange={(e) => setQuery({ ...query, sort: e.target.value })}
+            aria-label="Sort venues"
           >
             <option value="relevance">Sort: relevance</option>
-            <option value="price">Sort: price</option>
+            <option value="fit">Sort: best budget fit</option>
+            <option value="price">Sort: price low → high</option>
+            <option value="price_desc">Sort: price high → low</option>
             <option value="capacity">Sort: capacity</option>
           </select>
           <label className="flex items-center gap-2 text-sm text-slate-600">
@@ -480,6 +575,123 @@ export default function VenueDiscovery() {
             Reset
           </button>
         </div>
+
+        {/* Budget filter: uses quotes first, then draft estimate ranges */}
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-sand-200 bg-sand-50/60 p-3">
+          <div>
+            <label className="label" htmlFor="vd-min">Min price ₹</label>
+            <input
+              id="vd-min"
+              type="number"
+              min={0}
+              className="input w-32 tabular-nums"
+              placeholder="e.g. 3500"
+              value={query.min_price_inr ?? ""}
+              onChange={(e) =>
+                setQuery({
+                  ...query,
+                  min_price_inr: e.target.value ? Number(e.target.value) : null,
+                })
+              }
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="vd-max">Venue budget (max) ₹</label>
+            <input
+              id="vd-max"
+              type="number"
+              min={0}
+              className="input w-36 tabular-nums"
+              placeholder="e.g. 50000"
+              value={query.max_price_inr ?? ""}
+              onChange={(e) =>
+                setQuery({
+                  ...query,
+                  max_price_inr: e.target.value ? Number(e.target.value) : null,
+                })
+              }
+            />
+          </div>
+          {selected?.venue_budget_paise != null && (
+            <button
+              type="button"
+              className="mb-0.5 text-xs font-medium text-brand-700 hover:underline"
+              onClick={() =>
+                setQuery({
+                  ...query,
+                  max_price_inr: Math.round((selected.venue_budget_paise ?? 0) / 100),
+                })
+              }
+            >
+              Use plan's venue budget ({formatINR(selected.venue_budget_paise)})
+            </button>
+          )}
+          <div>
+            <label className="label" htmlFor="vd-match">Show</label>
+            <select
+              id="vd-match"
+              className="input w-60"
+              value={query.budget_match ?? "fits_or_unknown"}
+              onChange={(e) =>
+                setQuery({
+                  ...query,
+                  budget_match: e.target.value as VenueQuery["budget_match"],
+                })
+              }
+              disabled={query.max_price_inr == null}
+            >
+              <option value="fits_or_unknown">Fits, maybe fits, or price unknown</option>
+              <option value="fits">Fits or maybe fits</option>
+              <option value="within">Definitely within budget</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            className="mb-0.5 ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
+            onClick={() => setShowBands((s) => !s)}
+            aria-expanded={showBands}
+          >
+            <Info className="h-3.5 w-3.5" /> How prices are estimated
+          </button>
+        </div>
+        {showBands && bands && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm">
+            <p className="font-semibold text-amber-900">
+              {bands.estimate_label}
+              {bands.status === "draft" && (
+                <span className="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                  Draft
+                </span>
+              )}
+            </p>
+            <p className="mt-1 text-xs text-amber-800">{bands.note}</p>
+            <table className="mt-3 w-full text-xs">
+              <thead className="text-left text-amber-900/70">
+                <tr>
+                  <th className="py-1 font-medium">Venue type</th>
+                  <th className="py-1 font-medium">Typical range per event</th>
+                  <th className="py-1 font-medium">Covers</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-200/70 text-slate-700">
+                {bands.bands.map((b) => (
+                  <tr key={b.venue_type}>
+                    <td className="py-1.5">{titleCase(b.venue_type.replace("_", " "))}</td>
+                    <td className="py-1.5 tabular-nums">
+                      {b.min_inr != null && b.max_inr != null
+                        ? `${formatINR(b.min_inr * 100)} – ${formatINR(b.max_inr * 100)}`
+                        : "Price unavailable"}
+                    </td>
+                    <td className="py-1.5">{b.covers ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-xs text-amber-800">
+              Got a real price? Use "Add quote" on a venue — your quote replaces the estimate.
+            </p>
+          </div>
+        )}
       </form>
 
       {/* View toggle + AI recommendation panel */}
@@ -556,15 +768,25 @@ export default function VenueDiscovery() {
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {rec.recommendations.map((v) => (
-                  <button
-                    key={v.id}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
-                    onClick={() => focusRecommendation(v)}
-                  >
-                    {v.name}
-                  </button>
-                ))}
+                {rec.recommendations.map((v) => {
+                  const p = rec.prices?.[v.id];
+                  return (
+                    <button
+                      key={v.id}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-left text-sm hover:bg-slate-100"
+                      onClick={() => focusRecommendation(v)}
+                    >
+                      <span className="block font-medium">{v.name}</span>
+                      {p && (
+                        <span className="block text-[11px] text-slate-500">
+                          {p.kind === "unavailable"
+                            ? "Price unavailable"
+                            : `${p.label}${p.budget_status !== "unknown" ? ` · ${p.budget_status.replace("_", " ")}` : ""}`}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
             <p className="mt-2 text-xs text-amber-600">{rec.disclaimer}</p>
@@ -640,15 +862,26 @@ export default function VenueDiscovery() {
                       {v.amenities.slice(0, 4).join(" · ")}
                     </p>
                   )}
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="font-semibold text-slate-900">
-                      {v.est_price_paise != null
-                        ? formatINR(v.est_price_paise)
-                        : "Price not listed"}
-                    </span>
-                    <Badge tone={sb.tone}>{sb.label}</Badge>
+                  <div className="mt-3 rounded-xl bg-sand-50 p-3">
+                    <VenuePriceTag price={prices[v.id]} compact />
                   </div>
-                  <button className="btn-primary mt-4" onClick={() => select(v)}>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <Badge tone={sb.tone}>{sb.label}</Badge>
+                    {eventId && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
+                        onClick={() => {
+                          setQuoteError(null);
+                          setQuoteVenue(v);
+                        }}
+                      >
+                        <Tag className="h-3.5 w-3.5" />
+                        {quotes[v.id] ? "Edit quote" : "Add quote"}
+                      </button>
+                    )}
+                  </div>
+                  <button className="btn-primary mt-auto pt-2" onClick={() => select(v)}>
                     <Check className="h-4 w-4" /> Select for event
                   </button>
                 </article>
@@ -679,6 +912,16 @@ export default function VenueDiscovery() {
           )}
         </>
       )}
+
+      <VenueQuoteForm
+        venue={quoteVenue}
+        existing={quoteVenue ? quotes[quoteVenue.id] : undefined}
+        saving={quoteSaving}
+        serverError={quoteError}
+        onSave={(q) => void saveQuote(q)}
+        onDelete={() => void deleteQuote()}
+        onClose={() => setQuoteVenue(null)}
+      />
     </div>
   );
 }

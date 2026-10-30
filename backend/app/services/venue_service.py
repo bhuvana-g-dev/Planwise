@@ -17,10 +17,13 @@ from app.core.money import rupees_to_paise
 from app.models.venue import (
     Venue,
     VenuePage,
+    VenuePrice,
     VenueQuery,
+    VenueQuote,
     VenueSource,
     VenueType,
 )
+from app.services import venue_pricing
 
 DEMO_DISCLAIMER = (
     "Demo venues for illustration only — not verified real businesses. "
@@ -150,9 +153,8 @@ def _matches(v: Venue, q: VenueQuery) -> bool:
         return False
     if q.max_capacity is not None and v.capacity and v.capacity > q.max_capacity:
         return False
-    if q.max_price_inr is not None and v.est_price_paise is not None:
-        if v.est_price_paise > rupees_to_paise(q.max_price_inr):
-            return False
+    # Price filtering is applied in _matches_price, using the resolved price
+    # (quote > listed > estimate), so it is not done here.
     if q.indoor is True and not v.indoor:
         return False
     if q.outdoor is True and not v.outdoor:
@@ -164,21 +166,80 @@ def _matches(v: Venue, q: VenueQuery) -> bool:
     return True
 
 
-def _sort(venues: list[Venue], sort: str) -> list[Venue]:
-    if sort == "price":
-        return sorted(venues, key=lambda v: (v.est_price_paise is None,
-                                             v.est_price_paise or 0))
+def _matches_price(p: VenuePrice, q: VenueQuery) -> bool:
+    """Budget window filter using the resolved price."""
+    if q.min_price_inr is not None and p.max_paise is not None:
+        # Whole price range below the minimum -> outside the window.
+        if p.max_paise < rupees_to_paise(q.min_price_inr):
+            return False
+    if q.max_price_inr is None:
+        return True
+    status = p.budget_status
+    if status == "outside":
+        return False
+    if q.budget_match == "fits" and status == "unknown":
+        return False
+    if q.budget_match == "within" and status != "within":
+        return False
+    return True
+
+
+def _sort(venues: list[Venue], sort: str,
+          prices: dict[str, VenuePrice] | None = None) -> list[Venue]:
+    prices = prices or {}
+
+    def price_of(v: Venue) -> VenuePrice:
+        return prices.get(v.id) or venue_pricing.resolve(v, None, None)
+
+    if sort in ("price", "price_desc"):
+        priced = [v for v in venues if price_of(v).min_paise is not None]
+        unpriced = [v for v in venues if price_of(v).min_paise is None]
+        if sort == "price":
+            # Cheapest possible price first; quotes win ties over estimates.
+            priced.sort(key=lambda v: (price_of(v).min_paise,
+                                       price_of(v).max_paise,
+                                       venue_pricing.KIND_RANK[price_of(v).kind]))
+        else:
+            priced.sort(key=lambda v: (-(price_of(v).max_paise or 0),
+                                       -(price_of(v).min_paise or 0),
+                                       venue_pricing.KIND_RANK[price_of(v).kind]))
+        return priced + unpriced  # "Price unavailable" always last
+    if sort == "fit":
+        return sorted(venues, key=lambda v: (
+            venue_pricing.FIT_RANK[price_of(v).budget_status],
+            venue_pricing.KIND_RANK[price_of(v).kind],
+            price_of(v).min_paise if price_of(v).min_paise is not None else 10**15,
+        ))
     if sort == "capacity":
         return sorted(venues, key=lambda v: -v.capacity)
     return venues  # relevance = catalogue order (keyword already filtered)
 
 
-def search(query: VenueQuery, extra: list[Venue] | None = None) -> VenuePage:
-    """Search real (OSM) + user-provided venues with filter/sort/pagination."""
+def search(query: VenueQuery, extra: list[Venue] | None = None,
+           quotes: dict[str, VenueQuote] | None = None) -> VenuePage:
+    """Search real (OSM) + user-provided venues with filter/sort/pagination.
+
+    `quotes` (venue_id -> user quote for one event) override estimates.
+    """
     catalogue, source_mode, disclaimer = _resolve_catalogue(query)
     catalogue = catalogue + list(extra or [])
-    filtered = [v for v in catalogue if _matches(v, query)]
-    filtered = _sort(filtered, query.sort)
+    # De-duplicate by id (a shortlisted venue may also be in the catalogue).
+    seen: set[str] = set()
+    unique: list[Venue] = []
+    for v in catalogue:
+        if v.id not in seen:
+            seen.add(v.id)
+            unique.append(v)
+
+    budget = (rupees_to_paise(query.max_price_inr)
+              if query.max_price_inr is not None else None)
+    quotes = quotes or {}
+    prices = {v.id: venue_pricing.resolve(v, quotes.get(v.id), budget)
+              for v in unique}
+
+    filtered = [v for v in unique
+                if _matches(v, query) and _matches_price(prices[v.id], query)]
+    filtered = _sort(filtered, query.sort, prices)
 
     total = len(filtered)
     start = (query.page - 1) * query.page_size
@@ -194,6 +255,7 @@ def search(query: VenueQuery, extra: list[Venue] | None = None) -> VenuePage:
         total_pages=total_pages,
         source_mode=source_mode,
         disclaimer=disclaimer,
+        prices={v.id: prices[v.id] for v in page_items},
     )
 
 
@@ -235,24 +297,34 @@ def venue_from_create(data) -> Venue:
 # --------------------------------------------------------------------------
 def recommend(event_type: str, city: str, guest_count: int,
               venue_budget_paise: int | None, indoor_pref: str,
-              required_amenities: list[str]) -> dict:
+              required_amenities: list[str],
+              quotes: dict[str, VenueQuote] | None = None,
+              extra: list[Venue] | None = None) -> dict:
     """Return a recommendation. generated_by = 'gemini' | 'deterministic'.
 
-    Deterministic ranking: capacity >= guests, within budget, amenity match,
-    indoor/outdoor preference. Gemini only adds narrative reasoning.
+    Deterministic ranking: capacity >= guests, budget fit (quote > listed >
+    estimate; "price unavailable" no longer counts as within budget), amenity
+    match, indoor/outdoor preference. Gemini only adds narrative reasoning.
     """
     page = search(VenueQuery(city=city, amenities=required_amenities,
-                             page_size=50))
+                             page_size=50), extra=extra, quotes=quotes)
     candidates = page.results
     if not candidates:
-        page = search(VenueQuery(city=city, page_size=50))
+        page = search(VenueQuery(city=city, page_size=50), extra=extra,
+                      quotes=quotes)
         candidates = page.results
+
+    quotes = quotes or {}
+    prices = {v.id: venue_pricing.resolve(v, quotes.get(v.id),
+                                          venue_budget_paise)
+              for v in candidates}
 
     def score(v: Venue) -> tuple:
         # capacity 0 means "unknown" (common in OSM) — don't penalise as "small".
         fits_cap = v.capacity == 0 or v.capacity >= guest_count
-        within = (venue_budget_paise is None or v.est_price_paise is None
-                  or v.est_price_paise <= venue_budget_paise)
+        p = prices[v.id]
+        # within 3 > possibly 2 > unknown 1 > outside 0
+        fit = 3 - venue_pricing.FIT_RANK[p.budget_status]
         amen = len(set(a.lower() for a in required_amenities)
                    & set(a.lower() for a in v.amenities))
         pref_ok = (
@@ -260,8 +332,8 @@ def recommend(event_type: str, city: str, guest_count: int,
             (indoor_pref == "outdoor" and v.outdoor) or
             indoor_pref not in ("indoor", "outdoor")
         )
-        return (fits_cap, within, pref_ok, amen,
-                -(v.est_price_paise or 10**12))
+        return (fits_cap, fit, pref_ok, amen,
+                -(p.min_paise if p.min_paise is not None else 10**12))
 
     ranked = sorted(candidates, key=score, reverse=True)[:3]
 
@@ -272,6 +344,7 @@ def recommend(event_type: str, city: str, guest_count: int,
     return {
         "generated_by": reasoning["generated_by"],
         "recommendations": [v.model_dump(mode="json") for v in ranked],
+        "prices": {v.id: prices[v.id].model_dump(mode="json") for v in ranked},
         "reasoning": reasoning["text"],
         "disclaimer": page.disclaimer,
         "source_mode": page.source_mode,

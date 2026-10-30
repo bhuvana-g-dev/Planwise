@@ -91,6 +91,15 @@ class Repository(ABC):
     def save_shortlisted_venues(self, event_id: str,
                                 venues: list[dict]) -> list[dict]: ...
 
+    # --- venue quotes (user-entered prices; override estimates) ---
+    @abstractmethod
+    def get_venue_quotes(self, event_id: str) -> dict:
+        """Return {venue_id: quote_dict} (empty dict if none)."""
+        ...
+
+    @abstractmethod
+    def save_venue_quotes(self, event_id: str, quotes: dict) -> dict: ...
+
     # --- caterers (discovery picks, manual arrangements, booking state) ---
     @abstractmethod
     def get_caterers(self, event_id: str) -> Optional[dict]:

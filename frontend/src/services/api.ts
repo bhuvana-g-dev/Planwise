@@ -11,6 +11,9 @@ import type {
   GuestSummary,
   InterpretReplanResult,
   Plan,
+  PriceBandsInfo,
+  VenueQuote,
+  VenueQuoteInput,
   ReplanRequest,
   ReplanResult,
   SelectedVenue,
@@ -160,6 +163,30 @@ export const api = {
       method: "POST",
       body: JSON.stringify(query),
     }),
+
+  /** Event-scoped search: this event's quotes override draft estimates. */
+  searchEventVenues: (id: string, query: VenueQuery) =>
+    request<VenuePage>(`/api/events/${id}/venues/search`, {
+      method: "POST",
+      body: JSON.stringify(query),
+    }),
+
+  venuePriceBands: () => request<PriceBandsInfo>(`/api/venues/price-bands`),
+
+  listVenueQuotes: (id: string) =>
+    request<Record<string, VenueQuote>>(`/api/events/${id}/venues/quotes`),
+
+  saveVenueQuote: (id: string, venueId: string, quote: VenueQuoteInput) =>
+    request<Record<string, VenueQuote>>(
+      `/api/events/${id}/venues/${encodeURIComponent(venueId)}/quote`,
+      { method: "PUT", body: JSON.stringify(quote) }
+    ),
+
+  deleteVenueQuote: (id: string, venueId: string) =>
+    request<Record<string, VenueQuote>>(
+      `/api/events/${id}/venues/${encodeURIComponent(venueId)}/quote`,
+      { method: "DELETE" }
+    ),
 
   listShortlist: (id: string) =>
     request<Venue[]>(`/api/events/${id}/venues/shortlist`),

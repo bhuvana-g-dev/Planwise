@@ -488,7 +488,11 @@ def select_venue(event_id: str, venue_id: str, owner_id: Optional[str]):
     })
 
     venue_budget = _venue_budget_paise(event_id)
-    price = venue.est_price_paise
+    quote = _venue_quotes(event_id).get(venue.id)
+    from app.services import venue_pricing
+    price_info = venue_pricing.resolve(venue, quote, venue_budget)
+    # A single known price: the user's quote overrides the venue record.
+    price = quote.amount_paise if quote else venue.est_price_paise
     remaining = overrun = within = None
     if venue_budget is not None and price is not None:
         remaining = venue_budget - price
@@ -498,6 +502,7 @@ def select_venue(event_id: str, venue_id: str, owner_id: Optional[str]):
     return SelectedVenue(
         venue=venue, est_price_paise=price, venue_budget_paise=venue_budget,
         remaining_paise=remaining, overrun_paise=overrun, within_budget=within,
+        price=price_info,
     )
 
 
@@ -509,4 +514,80 @@ def recommend_venues(event_id: str, indoor_pref: str,
     return venue_service.recommend(
         event.event_type.value, event.location.split(",")[0].strip(),
         event.guest_count, venue_budget, indoor_pref, list(required_amenities),
+        quotes=_venue_quotes(event_id),
     )
+
+
+# --------------------------------------------------------------------------
+# Venue quotes (user-entered prices that override estimates)
+# --------------------------------------------------------------------------
+def _venue_quotes(event_id: str) -> dict:
+    from app.models.venue import VenueQuote
+    raw = get_repository().get_venue_quotes(event_id) or {}
+    out = {}
+    for vid, q in raw.items():
+        try:
+            out[vid] = VenueQuote.model_validate(q)
+        except Exception:
+            continue  # skip a corrupt entry rather than break search
+    return out
+
+
+def list_venue_quotes(event_id: str, owner_id: Optional[str]) -> dict:
+    get_event(event_id, owner_id)
+    return {vid: q.model_dump(mode="json")
+            for vid, q in _venue_quotes(event_id).items()}
+
+
+def save_venue_quote(event_id: str, venue_id: str, data,
+                     owner_id: Optional[str]) -> dict:
+    """Create or replace the quote for one venue in this event."""
+    from app.core.money import rupees_to_paise
+    from app.models.venue import VenueQuote
+    get_event(event_id, owner_id)
+    venue_id = (venue_id or "").strip()
+    if not venue_id or len(venue_id) > 120:
+        raise InvalidProposal("Invalid venue id")
+    if data.scope == "rental_only" and data.package_includes:
+        raise InvalidProposal(
+            "A rental-only price can't list package inclusions — choose "
+            "'Event package' or remove the inclusions."
+        )
+    quote = VenueQuote(
+        venue_id=venue_id,
+        amount_paise=rupees_to_paise(data.amount_inr),
+        scope=data.scope,
+        package_includes=data.package_includes,
+        notes=data.notes.strip(),
+        venue_name=data.venue_name.strip(),
+        venue_type=data.venue_type,
+        updated_at=_now(),
+    )
+    quotes = {vid: q.model_dump(mode="json")
+              for vid, q in _venue_quotes(event_id).items()}
+    quotes[venue_id] = quote.model_dump(mode="json")
+    get_repository().save_venue_quotes(event_id, quotes)
+    return quotes
+
+
+def delete_venue_quote(event_id: str, venue_id: str,
+                       owner_id: Optional[str]) -> dict:
+    get_event(event_id, owner_id)
+    quotes = {vid: q.model_dump(mode="json")
+              for vid, q in _venue_quotes(event_id).items()}
+    if venue_id not in quotes:
+        raise NotFound(venue_id)
+    quotes.pop(venue_id)
+    get_repository().save_venue_quotes(event_id, quotes)
+    return quotes
+
+
+def search_event_venues(event_id: str, query, owner_id: Optional[str]):
+    """Venue search for one event: applies this event's quotes and includes
+    its shortlisted/manual venues so their quotes take effect too."""
+    from app.services import venue_service
+    get_event(event_id, owner_id)
+    extra = [Venue.model_validate(v)
+             for v in get_repository().list_shortlisted_venues(event_id)]
+    return venue_service.search(query, extra=extra,
+                                quotes=_venue_quotes(event_id))

@@ -194,6 +194,18 @@ class JsonRepository(Repository):
             self._write(db)
             return venues
 
+    # ---- venue quotes ----
+    def get_venue_quotes(self, event_id: str) -> dict:
+        with self._lock:
+            return dict(self._read().get("venue_quotes", {}).get(event_id, {}))
+
+    def save_venue_quotes(self, event_id: str, quotes: dict) -> dict:
+        with self._lock:
+            db = self._read()
+            db.setdefault("venue_quotes", {})[event_id] = quotes
+            self._write(db)
+            return quotes
+
     # ---- caterers ----
     def get_caterers(self, event_id: str) -> Optional[dict]:
         with self._lock:

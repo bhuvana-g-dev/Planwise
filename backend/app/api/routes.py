@@ -12,7 +12,7 @@ from app.models.change import ReplanRequest
 from app.models.event import EventCreate
 from app.models.guest import GuestCreate
 from app.models.plan import VendorQuote
-from app.models.venue import VenueCreate, VenueQuery
+from app.models.venue import VenueCreate, VenueQuery, VenueQuoteInput
 from app.services import event_service
 from app.services.event_service import (
     Forbidden,
@@ -268,6 +268,22 @@ def search_venues(query: VenueQuery):
     return event_service.search_venues(query).model_dump(mode="json")
 
 
+@router.get("/venues/price-bands")
+def venue_price_bands():
+    """The DRAFT estimated price bands by venue type (unverified).
+
+    Registered before /venues/{venue_id} so "price-bands" isn't read as an id.
+    """
+    from app.core.venue_price_bands import (
+        BANDS_NOTE,
+        BANDS_STATUS,
+        ESTIMATE_LABEL,
+        bands_table,
+    )
+    return {"status": BANDS_STATUS, "note": BANDS_NOTE,
+            "estimate_label": ESTIMATE_LABEL, "bands": bands_table()}
+
+
 @router.get("/venues/{venue_id}")
 def get_venue(venue_id: str, event_id: Optional[str] = None,
               owner=Depends(get_current_owner)):
@@ -349,6 +365,44 @@ def recommend_venues(event_id: str, payload: VenueRecommendPayload,
         return event_service.recommend_venues(
             event_id, payload.indoor_pref, payload.required_amenities, owner
         )
+    except Exception as exc:
+        _handle(exc)
+
+
+# --- Venue pricing: user-entered quotes (price bands route is above) ---
+@router.post("/events/{event_id}/venues/search")
+def search_event_venues(event_id: str, query: VenueQuery,
+                        owner=Depends(get_current_owner)):
+    """Event-scoped search: applies this event's quotes over estimates."""
+    try:
+        return event_service.search_event_venues(
+            event_id, query, owner).model_dump(mode="json")
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.get("/events/{event_id}/venues/quotes")
+def list_venue_quotes(event_id: str, owner=Depends(get_current_owner)):
+    try:
+        return event_service.list_venue_quotes(event_id, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.put("/events/{event_id}/venues/{venue_id}/quote")
+def save_venue_quote(event_id: str, venue_id: str, payload: VenueQuoteInput,
+                     owner=Depends(get_current_owner)):
+    try:
+        return event_service.save_venue_quote(event_id, venue_id, payload, owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.delete("/events/{event_id}/venues/{venue_id}/quote")
+def delete_venue_quote(event_id: str, venue_id: str,
+                       owner=Depends(get_current_owner)):
+    try:
+        return event_service.delete_venue_quote(event_id, venue_id, owner)
     except Exception as exc:
         _handle(exc)
 

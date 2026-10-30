@@ -361,19 +361,76 @@ export interface Venue {
   notes: string;
 }
 
+export type BudgetMatch = "fits_or_unknown" | "fits" | "within";
+
 export interface VenueQuery {
   keyword?: string;
   venue_type?: VenueType | null;
   city?: string;
   min_capacity?: number | null;
   max_capacity?: number | null;
+  min_price_inr?: number | null;
   max_price_inr?: number | null;
+  budget_match?: BudgetMatch;
   indoor?: boolean | null;
   outdoor?: boolean | null;
   amenities?: string[];
+  /** relevance | price | price_desc | capacity | fit */
   sort?: string;
   page?: number;
   page_size?: number;
+}
+
+export type PriceKind = "quoted" | "listed" | "estimated" | "unavailable";
+export type PriceScope = "rental_only" | "package";
+export type VenueBudgetStatus = "within" | "possibly_within" | "outside" | "unknown";
+
+/** The price that applies to a venue (quote > listed > draft estimate). */
+export interface VenuePrice {
+  kind: PriceKind;
+  label: string;
+  min_paise: number | null;
+  max_paise: number | null;
+  scope: PriceScope | null;
+  scope_label: string;
+  package_includes: string[];
+  verified: boolean;
+  budget_paise: number | null;
+  budget_status: VenueBudgetStatus;
+  note: string;
+}
+
+export interface VenueQuoteInput {
+  amount_inr: number;
+  scope: PriceScope;
+  package_includes: string[];
+  notes: string;
+  venue_name?: string;
+  venue_type?: VenueType | null;
+}
+
+export interface VenueQuote {
+  venue_id: string;
+  amount_paise: number;
+  scope: PriceScope;
+  package_includes: string[];
+  notes: string;
+  venue_name: string;
+  venue_type: VenueType | null;
+  updated_at: string;
+}
+
+export interface PriceBandsInfo {
+  status: string;
+  note: string;
+  estimate_label: string;
+  bands: {
+    venue_type: VenueType;
+    min_inr: number | null;
+    max_inr: number | null;
+    scope: PriceScope | null;
+    covers: string | null;
+  }[];
 }
 
 export interface VenuePage {
@@ -384,6 +441,7 @@ export interface VenuePage {
   total_pages: number;
   source_mode: string;
   disclaimer: string;
+  prices?: Record<string, VenuePrice>;
 }
 
 export interface SelectedVenue {
@@ -393,11 +451,13 @@ export interface SelectedVenue {
   remaining_paise: number | null;
   overrun_paise: number | null;
   within_budget: boolean | null;
+  price?: VenuePrice | null;
 }
 
 export interface VenueRecommendation {
   generated_by: string;
   recommendations: Venue[];
+  prices?: Record<string, VenuePrice>;
   reasoning: string;
   disclaimer: string;
 }
