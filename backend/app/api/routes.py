@@ -10,7 +10,7 @@ from app.api.deps import get_current_owner
 from app.models.catering import CateringPlan, CateringPreferences
 from app.models.change import ReplanRequest
 from app.models.event import EventCreate
-from app.models.guest import GuestCreate
+from app.models.guest import GuestCreate, GuestImportRequest
 from app.models.plan import VendorQuote
 from app.models.venue import VenueCreate, VenueQuery, VenueQuoteInput
 from app.services import event_service
@@ -205,6 +205,19 @@ def save_guests(event_id: str, payload: GuestListPayload,
                 owner=Depends(get_current_owner)):
     try:
         return event_service.save_guests(event_id, list(payload.guests), owner)
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.post("/events/{event_id}/guests/import")
+def import_guests(event_id: str, payload: GuestImportRequest,
+                  owner=Depends(get_current_owner)):
+    """Append contacts the user selected in the import preview.
+
+    Validates phones server-side and skips duplicates (reported, not merged).
+    """
+    try:
+        return event_service.import_guests(event_id, payload, owner)
     except Exception as exc:
         _handle(exc)
 

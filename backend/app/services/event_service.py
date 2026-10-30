@@ -288,6 +288,85 @@ def save_guests(event_id: str, guests: list, owner_id: Optional[str]):
     return {"guests": stored, "summary": summary.model_dump(mode="json")}
 
 
+def import_guests(event_id: str, request, owner_id: Optional[str]) -> dict:
+    """Append explicitly selected contacts to the guest list.
+
+    Existing guests are never modified. Phones are re-validated server-side
+    (never trusted from the client). Duplicates — against the existing list
+    or within this batch — are skipped and reported, never silently merged.
+    """
+    from app.models.guest import Guest, GuestCreate
+    from app.services import guest_service, phone
+
+    get_event(event_id, owner_id)
+    existing = [Guest.model_validate(g)
+                for g in get_repository().list_guests(event_id)]
+
+    existing_phones: set[str] = set()
+    existing_names: set[str] = set()
+    for g in existing:
+        r = phone.best_of(g.contact) if g.contact else None
+        if r and r.valid:
+            existing_phones.add(r.e164)
+        existing_names.add(phone.name_key(g.name))
+
+    batch_phones: set[str] = set()
+    batch_names: set[str] = set()
+    added: list[Guest] = []
+    skipped: list[dict] = []
+    group = (request.group or "").strip()[:80]
+
+    for item in request.contacts:
+        name = " ".join((item.name or "").split())[:160]
+        raw = (item.phone or "").strip()
+        if not name:
+            skipped.append({"name": raw or "(blank)", "reason": "Missing name"})
+            continue
+        res = phone.best_of(raw) if raw else None
+        key_name = phone.name_key(name)
+
+        if res and res.valid:
+            if res.e164 in existing_phones:
+                skipped.append({"name": name,
+                                "reason": "Already a guest (same phone)"})
+                continue
+            if res.e164 in batch_phones:
+                skipped.append({"name": name,
+                                "reason": "Duplicate in this import"})
+                continue
+            batch_phones.add(res.e164)
+            contact, notes = res.e164, ""
+        else:
+            # No usable phone: fall back to name-based duplicate detection.
+            if key_name in existing_names:
+                skipped.append({"name": name,
+                                "reason": "Already a guest (same name)"})
+                continue
+            if key_name in batch_names:
+                skipped.append({"name": name,
+                                "reason": "Duplicate in this import"})
+                continue
+            contact = ""
+            notes = (f"Imported number could not be verified: {raw}"[:500]
+                     if raw else "")
+        batch_names.add(key_name)
+
+        added.append(Guest(
+            id=f"g-{uuid.uuid4().hex[:8]}",
+            **GuestCreate(name=name, group=group, contact=contact,
+                          notes=notes).model_dump(),
+        ))
+
+    if added:
+        stored = [g.model_dump(mode="json") for g in existing + added]
+        get_repository().save_guests(event_id, stored)
+    else:
+        stored = [g.model_dump(mode="json") for g in existing]
+    summary = guest_service.summarize(existing + added)
+    return {"added": len(added), "skipped": skipped, "guests": stored,
+            "summary": summary.model_dump(mode="json")}
+
+
 def guest_summary(event_id: str, owner_id: Optional[str]):
     from app.models.guest import Guest
     from app.services import guest_service

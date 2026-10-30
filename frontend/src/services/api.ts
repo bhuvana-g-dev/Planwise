@@ -8,6 +8,7 @@ import type {
   EventRecord,
   GenerateMenuResult,
   Guest,
+  GuestImportResult,
   GuestSummary,
   InterpretReplanResult,
   Plan,
@@ -135,6 +136,18 @@ export const api = {
       `/api/events/${id}/guests`,
       { method: "PUT", body: JSON.stringify({ guests }) }
     ),
+
+  /** Append contacts the user explicitly selected (server re-validates). */
+  importGuests: (
+    id: string,
+    contacts: { name: string; phone: string }[],
+    group: string,
+    source: string
+  ) =>
+    request<GuestImportResult>(`/api/events/${id}/guests/import`, {
+      method: "POST",
+      body: JSON.stringify({ contacts, group, source }),
+    }),
 
   getCatering: (id: string) =>
     request<CateringState>(`/api/events/${id}/catering`),

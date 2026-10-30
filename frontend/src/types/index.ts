@@ -208,6 +208,13 @@ export interface Guest {
   notes: string;
 }
 
+export interface GuestImportResult {
+  added: number;
+  skipped: { name: string; reason: string }[];
+  guests: Guest[];
+  summary: GuestSummary;
+}
+
 export interface GuestSummary {
   total_guests: number;
   total_headcount: number;
