@@ -62,7 +62,12 @@ def get_event(event_id: str, owner_id: Optional[str]) -> dict:
     repo = get_repository()
     event = repo.get_event(event_id)
     if event is None:
-        raise NotFound(event_id)
+        # A bare ID reads like a crash; say what actually happened.
+        raise NotFound(
+            f"Event {event_id} was not found. It may have been deleted, or the "
+            "server's storage was reset. Open your events list and pick or "
+            "create an event."
+        )
     _check_owner(event, owner_id)
     return event
 
