@@ -631,6 +631,9 @@ export interface CatererSearchResponse {
   status: "ok" | "unavailable" | "invalid";
   results: CatererSearchResult[];
   message: string;
+  /** Set when results came from the partial fallback search. */
+  notice?: string;
+  search_mode?: "full" | "name_search";
   attribution: string;
   center: { lat: number; lng: number; label: string } | null;
   radius_km?: number;

@@ -419,10 +419,16 @@ class _Resp:
         return self._payload
 
 
-@pytest.fixture
-def fake_osm(monkeypatch):
+def _reset_search_state(monkeypatch):
     caterer_search._GEOCODE_CACHE.clear()
     caterer_search._SEARCH_CACHE.clear()
+    monkeypatch.setattr(caterer_search, "_overpass_down_until", 0.0)
+    monkeypatch.setattr(caterer_search, "NOMINATIM_MIN_INTERVAL_S", 0.0)
+
+
+@pytest.fixture
+def fake_osm(monkeypatch):
+    _reset_search_state(monkeypatch)
 
     def _get(url, **kw):
         return _Resp([{"lat": "9.9252", "lon": "78.1198",
@@ -468,6 +474,7 @@ def test_search_maps_real_fields_and_never_invents(fake_osm):
     # No price or availability fields exist on search results at all.
     assert "price" not in r and "availability" not in r
     assert "OpenStreetMap" in out["attribution"]
+    assert out["search_mode"] == "full" and out["notice"] == ""
 
 
 def test_search_veg_filter_drops_explicit_non_veg(fake_osm):
@@ -477,9 +484,142 @@ def test_search_veg_filter_drops_explicit_non_veg(fake_osm):
     assert "Temple View Restaurant" not in names   # restaurants opt-in only
 
 
-def test_search_unavailable_returns_empty_not_fake(monkeypatch):
-    caterer_search._GEOCODE_CACHE.clear()
+# --- Fallback when every Overpass mirror is down -------------------------
+_GEO = [{"lat": "9.9252", "lon": "78.1198",
+         "display_name": "Madurai, Tamil Nadu, India"}]
+_NOMINATIM_ITEMS = [
+    {"osm_type": "node", "osm_id": 101, "lat": "9.93", "lon": "78.12",
+     "category": "craft", "type": "caterer", "name": "Chettinad Catering Services",
+     "extratags": {"phone": "+91 452 111 1111", "diet:vegetarian": "only"},
+     "address": {"road": "West Masi Street", "city": "Madurai",
+                 "postcode": "625001"}},
+    {"osm_type": "way", "osm_id": 102, "lat": "9.94", "lon": "78.10",
+     "category": "amenity", "type": "restaurant", "name": "Nanban Catering",
+     "extratags": {}, "address": {}},
+    {"osm_type": "way", "osm_id": 103, "lat": "9.92", "lon": "78.11",
+     "category": "highway", "type": "residential", "name": "Catering Road",
+     "extratags": {}, "address": {}},                       # not a business
+    {"osm_type": "node", "osm_id": 104, "lat": "9.95", "lon": "78.14",
+     "category": "amenity", "type": "restaurant", "name": "Temple View Restaurant",
+     "extratags": {}, "address": {}},                       # restaurant, opt-in
+    {"osm_type": "node", "osm_id": 105, "lat": "11.0", "lon": "79.5",
+     "category": "craft", "type": "caterer", "name": "Far Away Caterers",
+     "extratags": {}, "address": {}},                       # outside radius
+]
+
+
+def _fallback_get(calls):
+    def _get(url, params=None, **kw):
+        params = params or {}
+        calls.append(params.get("q"))
+        if params.get("bounded") == 1:          # fallback name search
+            return _Resp(_NOMINATIM_ITEMS)
+        return _Resp(_GEO)                      # geocode
+    return _get
+
+
+def _down(*a, **k):
+    raise RuntimeError("overpass 502")
+
+
+def test_fallback_finds_real_caterers_when_overpass_is_down(monkeypatch):
+    _reset_search_state(monkeypatch)
+    calls: list = []
+    monkeypatch.setattr(caterer_search.httpx, "get", _fallback_get(calls))
+    monkeypatch.setattr(caterer_search.httpx, "post", _down)
+
+    out = caterer_search.search("Madurai", 25, "both")
+    assert out["status"] == "ok"
+    assert out["search_mode"] == "name_search"
+    assert "may miss some caterers" in out["notice"]
+    names = [r["name"] for r in out["results"]]
+    # Real (fixture) businesses only; road, far-away and plain restaurant out.
+    assert names == ["Chettinad Catering Services", "Nanban Catering"]
+    r = out["results"][0]
+    assert r["kind"] == "caterer" and r["diet"] == "pure_veg"
+    assert r["phone"] == "+91 452 111 1111"
+    assert r["address"] == "West Masi Street, Madurai, 625001"
+    assert r["provider_id"] == caterer_search._stable_id("node", 101)
+    assert r["osm_url"] == "https://www.openstreetmap.org/node/101"
+    assert "price" not in r and "availability" not in r
+    # Restaurants still require opt-in in fallback mode.
     caterer_search._SEARCH_CACHE.clear()
+    with_rest = caterer_search.search("Madurai", 25, "both",
+                                      include_restaurants=True)
+    assert "Temple View Restaurant" in [x["name"] for x in with_rest["results"]]
+    assert "restaurant" in calls
+
+
+def test_fallback_and_overpass_both_down_is_unavailable(monkeypatch):
+    _reset_search_state(monkeypatch)
+
+    def _get(url, params=None, **kw):
+        if (params or {}).get("bounded") == 1:
+            raise RuntimeError("nominatim down")
+        return _Resp(_GEO)
+
+    monkeypatch.setattr(caterer_search.httpx, "get", _get)
+    monkeypatch.setattr(caterer_search.httpx, "post", _down)
+    out = caterer_search.search("Madurai", 25, "both")
+    assert out["status"] == "unavailable" and out["results"] == []
+
+
+def test_overpass_cooldown_skips_dead_mirrors(monkeypatch):
+    _reset_search_state(monkeypatch)
+    posts: list = []
+
+    def _post(*a, **k):
+        posts.append(1)
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(caterer_search.httpx, "get", _fallback_get([]))
+    monkeypatch.setattr(caterer_search.httpx, "post", _post)
+    caterer_search.search("Madurai", 25, "both")
+    tried = len(posts)
+    assert tried == len(caterer_search.OVERPASS_URLS)
+    caterer_search.search("Madurai", 50, "both")    # different cache key
+    assert len(posts) == tried                      # cooled down: not retried
+
+
+def test_slow_overpass_is_cut_off_by_budget(monkeypatch):
+    import time as _time
+    _reset_search_state(monkeypatch)
+    monkeypatch.setattr(caterer_search, "OVERPASS_BUDGET_S", 0.4)
+    monkeypatch.setattr(caterer_search, "OVERPASS_HEDGE_S", 0.1)
+
+    def _slow(*a, **k):
+        _time.sleep(1.5)
+        raise RuntimeError("timeout")
+
+    monkeypatch.setattr(caterer_search.httpx, "get", _fallback_get([]))
+    monkeypatch.setattr(caterer_search.httpx, "post", _slow)
+    t = _time.monotonic()
+    out = caterer_search.search("Madurai", 25, "both")
+    assert _time.monotonic() - t < 1.2               # didn't wait 3 x 1.5 s
+    assert out["search_mode"] == "name_search" and out["results"]
+
+
+def test_hedged_overpass_uses_first_good_mirror(monkeypatch):
+    _reset_search_state(monkeypatch)
+    monkeypatch.setattr(caterer_search, "OVERPASS_HEDGE_S", 0.05)
+    good = {"elements": [{"type": "node", "id": 7, "lat": 9.93, "lon": 78.12,
+                          "tags": {"name": "Mirror Two Caterers",
+                                   "craft": "caterer"}}]}
+
+    def _post(url, **k):
+        if url == caterer_search.OVERPASS_URLS[0]:
+            raise RuntimeError("502")
+        return _Resp(good)
+
+    monkeypatch.setattr(caterer_search.httpx, "get", _fallback_get([]))
+    monkeypatch.setattr(caterer_search.httpx, "post", _post)
+    out = caterer_search.search("Madurai", 25, "both")
+    assert out["search_mode"] == "full"
+    assert [r["name"] for r in out["results"]] == ["Mirror Two Caterers"]
+
+
+def test_search_unavailable_returns_empty_not_fake(monkeypatch):
+    _reset_search_state(monkeypatch)
 
     def _boom(*a, **k):
         raise RuntimeError("network down")
