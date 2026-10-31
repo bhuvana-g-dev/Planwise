@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import InvitationCard from "../components/invitations/InvitationCard";
@@ -190,5 +190,40 @@ describe("event navigation", () => {
     expect(food.className).toContain("bg-brand-50");
     expect(screen.getByRole("link", { name: "Caterers & booking" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Menu & quantities" })).not.toHaveAttribute("aria-current");
+  });
+});
+
+describe("downloadBlob", () => {
+  it("doesn't revoke the URL right after clicking, only on the next download", async () => {
+    const { downloadBlob } = await import("../utils/invitationExport");
+    const created: string[] = [];
+    const revoked: string[] = [];
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    const origClick = HTMLAnchorElement.prototype.click;
+    const clicks: { href: string; download: string }[] = [];
+    URL.createObjectURL = () => { const u = `blob:test/${created.length}`; created.push(u); return u; };
+    URL.revokeObjectURL = (u: string) => { revoked.push(u); };
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      clicks.push({ href: this.getAttribute("href") ?? "", download: this.download });
+    };
+    try {
+      vi.useFakeTimers();
+      downloadBlob(new Blob(["a"], { type: "image/png" }), "one.png");
+      vi.advanceTimersByTime(10 * 60 * 1000);   // a long "Save as" dialog
+      expect(revoked).toEqual([]);
+      downloadBlob(new Blob(["b"], { type: "image/png" }), "two.png");
+      expect(revoked).toEqual(["blob:test/0"]);
+      expect(clicks).toEqual([
+        { href: "blob:test/0", download: "one.png" },
+        { href: "blob:test/1", download: "two.png" },
+      ]);
+      expect(document.querySelectorAll("a[download]").length).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      URL.createObjectURL = origCreate;
+      URL.revokeObjectURL = origRevoke;
+      HTMLAnchorElement.prototype.click = origClick;
+    }
   });
 });

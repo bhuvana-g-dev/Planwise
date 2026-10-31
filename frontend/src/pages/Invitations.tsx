@@ -166,7 +166,13 @@ export default function Invitations() {
   async function download() {
     setExporting(true);
     const blob = await makePng();
-    if (blob) downloadBlob(blob, invitationFilename(facts!.name));
+    if (blob) {
+      try {
+        downloadBlob(blob, invitationFilename(facts!.name));
+      } catch {
+        toast.error("Couldn't save the image. Try again.");
+      }
+    }
     setExporting(false);
   }
 
