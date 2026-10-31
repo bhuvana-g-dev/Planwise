@@ -21,6 +21,7 @@ const Catering = lazy(() => import("./pages/Catering"));
 const Caterers = lazy(() => import("./pages/Caterers"));
 const VenueDiscovery = lazy(() => import("./pages/VenueDiscovery"));
 const EventDay = lazy(() => import("./pages/EventDay"));
+const Invitations = lazy(() => import("./pages/Invitations"));
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="caterers" element={<Caterers />} />
             <Route path="venues-discovery" element={<VenueDiscovery />} />
             <Route path="event-day" element={<EventDay />} />
+            <Route path="invitations" element={<Invitations />} />
           </Route>
           <Route path="*" element={<Landing />} />
         </Route>

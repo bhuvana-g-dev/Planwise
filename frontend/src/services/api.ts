@@ -8,8 +8,12 @@ import type {
   EventRecord,
   GenerateMenuResult,
   Guest,
+  GuestImportResult,
   GuestSummary,
   InterpretReplanResult,
+  InvitationDesign,
+  InvitationTone,
+  InvitationWording,
   Plan,
   PriceBandsInfo,
   VenueQuote,
@@ -135,6 +139,34 @@ export const api = {
       `/api/events/${id}/guests`,
       { method: "PUT", body: JSON.stringify({ guests }) }
     ),
+
+  /** Append contacts the user explicitly selected (server re-validates). */
+  importGuests: (
+    id: string,
+    contacts: { name: string; phone: string }[],
+    group: string,
+    source: string
+  ) =>
+    request<GuestImportResult>(`/api/events/${id}/guests/import`, {
+      method: "POST",
+      body: JSON.stringify({ contacts, group, source }),
+    }),
+
+  getInvitation: (id: string) =>
+    request<{ design: InvitationDesign | null }>(`/api/events/${id}/invitation`),
+
+  saveInvitation: (id: string, design: InvitationDesign) =>
+    request<{ design: InvitationDesign }>(`/api/events/${id}/invitation`, {
+      method: "PUT",
+      body: JSON.stringify(design),
+    }),
+
+  /** AI headline + message suggestion. Never saved by the server. */
+  suggestInvitationWording: (id: string, tone: InvitationTone, details: string) =>
+    request<InvitationWording>(`/api/events/${id}/invitation/wording`, {
+      method: "POST",
+      body: JSON.stringify({ tone, details }),
+    }),
 
   getCatering: (id: string) =>
     request<CateringState>(`/api/events/${id}/catering`),

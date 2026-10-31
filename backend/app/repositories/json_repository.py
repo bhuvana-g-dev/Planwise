@@ -217,3 +217,15 @@ class JsonRepository(Repository):
             db.setdefault("caterers", {})[event_id] = store
             self._write(db)
             return store
+
+    # ---- invitation ----
+    def get_invitation(self, event_id: str) -> Optional[dict]:
+        with self._lock:
+            return self._read().get("invitations", {}).get(event_id)
+
+    def save_invitation(self, event_id: str, design: dict) -> dict:
+        with self._lock:
+            db = self._read()
+            db.setdefault("invitations", {})[event_id] = design
+            self._write(db)
+            return design

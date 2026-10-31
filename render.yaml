@@ -12,7 +12,17 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # Render's disk is ephemeral (wiped on deploy/restart/sleep), so events
+      # must live in Firestore, not the local JSON file.
       - key: PERSISTENCE
-        value: json
+        value: firestore
+      # The Firebase *Project ID* (Project settings > General), not the name.
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      # Set in the dashboard, never here. Either paste the full service-account
+      # JSON, or add a Secret File named serviceAccount.json and use
+      # /etc/secrets/serviceAccount.json. The backend accepts both.
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        sync: false
       - key: REQUIRE_AUTH
         value: "false"

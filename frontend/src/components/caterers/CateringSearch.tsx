@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import {
   CalendarDays,
   ClipboardPen,
+  Info,
   Loader2,
   MapPin,
+  RefreshCw,
   Search,
   TriangleAlert,
   Users,
@@ -260,6 +262,25 @@ export default function CateringSearch({
             </h2>
             <p className="text-xs text-slate-400">Within {res.radius_km} km · sorted by type, then distance</p>
           </div>
+
+          {res.notice && (
+            <div
+              className="mb-4 flex flex-wrap items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900"
+              role="status"
+            >
+              <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <p className="min-w-0 flex-1">{res.notice}</p>
+              <button
+                type="button"
+                className="btn-secondary !py-1.5 text-xs"
+                onClick={() => void run()}
+                disabled={loading}
+              >
+                <RefreshCw className={classNames("h-3.5 w-3.5", loading && "animate-spin")} aria-hidden="true" />
+                Search again
+              </button>
+            </div>
+          )}
 
           {res.results.length === 0 ? (
             <div className="card flex flex-col items-center p-10 text-center">

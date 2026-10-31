@@ -29,6 +29,21 @@ class Guest(GuestCreate):
     id: str
 
 
+class GuestImportItem(BaseModel):
+    """One contact chosen by the user for import (name + raw phone)."""
+
+    name: str = Field(default="", max_length=200)
+    phone: str = Field(default="", max_length=200)
+
+
+class GuestImportRequest(BaseModel):
+    """Contacts the user explicitly selected in the import preview."""
+
+    contacts: list[GuestImportItem] = Field(..., min_length=1, max_length=2000)
+    group: str = Field(default="", max_length=80)
+    source: str = Field(default="file", max_length=20)  # picker | csv | xlsx | vcf
+
+
 class GuestSummary(BaseModel):
     """Deterministically computed guest/RSVP rollup."""
 

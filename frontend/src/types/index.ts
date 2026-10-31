@@ -208,6 +208,13 @@ export interface Guest {
   notes: string;
 }
 
+export interface GuestImportResult {
+  added: number;
+  skipped: { name: string; reason: string }[];
+  guests: Guest[];
+  summary: GuestSummary;
+}
+
 export interface GuestSummary {
   total_guests: number;
   total_headcount: number;
@@ -624,6 +631,9 @@ export interface CatererSearchResponse {
   status: "ok" | "unavailable" | "invalid";
   results: CatererSearchResult[];
   message: string;
+  /** Set when results came from the partial fallback search. */
+  notice?: string;
+  search_mode?: "full" | "name_search";
   attribution: string;
   center: { lat: number; lng: number; label: string } | null;
   radius_km?: number;
@@ -648,4 +658,27 @@ export interface CatererBudgetPreview {
     within_budget: boolean;
   };
   warnings: string[];
+}
+
+// --- Invitations ---
+export type InvitationTone = "warm" | "formal" | "fun" | "traditional";
+
+export interface InvitationDesign {
+  template_id: string;
+  eyebrow: string;
+  headline: string;
+  hosts: string;
+  message: string;
+  date_text: string;
+  time_text: string;
+  venue_text: string;
+  dress_code: string;
+  rsvp_text: string;
+}
+
+export interface InvitationWording {
+  headline: string;
+  message: string;
+  tone: InvitationTone;
+  generated_by: "gemini" | "deterministic";
 }

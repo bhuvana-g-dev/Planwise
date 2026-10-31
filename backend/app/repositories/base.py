@@ -108,3 +108,12 @@ class Repository(ABC):
 
     @abstractmethod
     def save_caterers(self, event_id: str, store: dict) -> dict: ...
+
+    # --- invitation (one saved card design per event) ---
+    @abstractmethod
+    def get_invitation(self, event_id: str) -> Optional[dict]:
+        """Return the saved invitation design dict, or None."""
+        ...
+
+    @abstractmethod
+    def save_invitation(self, event_id: str, design: dict) -> dict: ...

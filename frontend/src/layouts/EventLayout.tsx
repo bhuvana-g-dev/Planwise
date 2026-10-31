@@ -1,18 +1,17 @@
 import { useState } from "react";
-import { NavLink, Outlet, useParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import {
-  CalendarClock,
   ChefHat,
   LayoutDashboard,
   ListChecks,
+  Mail,
   MapPinned,
   Menu,
   PartyPopper,
   Receipt,
-  RefreshCw,
+  Sparkles,
   Store,
   Users,
-  Utensils,
   X,
 } from "lucide-react";
 import { classNames } from "../utils/format";
@@ -22,104 +21,99 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   end?: boolean;
+  /** Extra sub-paths that should also highlight this item. */
+  also?: string[];
 }
 
 interface NavGroup {
-  title: string;
+  /** Omitted for the standalone top/bottom items. */
+  title?: string;
   items: NavItem[];
 }
 
-function groups(eventId: string): NavGroup[] {
+const icon = (C: typeof Receipt) => <C className="h-4 w-4 shrink-0" aria-hidden />;
+
+// One entry per job, short labels, three groups that follow how people plan:
+// sort the plan, book the suppliers, look after the guests.
+export function navGroups(eventId: string): NavGroup[] {
   const base = `/events/${eventId}`;
   return [
+    { items: [{ to: base, label: "Dashboard", icon: icon(LayoutDashboard), end: true }] },
     {
-      title: "Overview",
+      title: "Plan",
       items: [
-        {
-          to: base,
-          label: "Dashboard",
-          icon: <LayoutDashboard className="h-4 w-4" />,
-          end: true,
-        },
+        { to: `${base}/budget`, label: "Budget", icon: icon(Receipt) },
+        { to: `${base}/timeline`, label: "Timeline", icon: icon(ListChecks) },
+        { to: `${base}/adapt`, label: "Adapt with AI", icon: icon(Sparkles) },
       ],
     },
     {
-      title: "Planning",
+      title: "Book",
       items: [
-        {
-          to: `${base}/budget`,
-          label: "Budget & Expenses",
-          icon: <Receipt className="h-4 w-4" />,
-        },
-        {
-          to: `${base}/catering`,
-          label: "Catering & Menu",
-          icon: <ChefHat className="h-4 w-4" />,
-        },
-        {
-          to: `${base}/caterers`,
-          label: "Caterers & Booking",
-          icon: <Utensils className="h-4 w-4" />,
-        },
-        {
-          to: `${base}/timeline`,
-          label: "Timeline & Tasks",
-          icon: <ListChecks className="h-4 w-4" />,
-        },
-        {
-          to: `${base}/adapt`,
-          label: "Adapt Plan",
-          icon: <RefreshCw className="h-4 w-4" />,
-        },
+        { to: `${base}/venues-discovery`, label: "Venues", icon: icon(MapPinned) },
+        { to: `${base}/catering`, label: "Food & catering", icon: icon(ChefHat), also: [`${base}/caterers`] },
+        { to: `${base}/vendors`, label: "Vendors", icon: icon(Store) },
       ],
     },
     {
-      title: "People & Suppliers",
+      title: "Guests",
       items: [
-        {
-          to: `${base}/guests`,
-          label: "Guests & RSVP",
-          icon: <Users className="h-4 w-4" />,
-        },
-        {
-          to: `${base}/venues-discovery`,
-          label: "Venues & Maps",
-          icon: <MapPinned className="h-4 w-4" />,
-        },
-        {
-          to: `${base}/vendors`,
-          label: "Vendors & Quotes",
-          icon: <Store className="h-4 w-4" />,
-        },
+        { to: `${base}/guests`, label: "Guest list", icon: icon(Users) },
+        { to: `${base}/invitations`, label: "Invitations", icon: icon(Mail) },
       ],
     },
-    {
-      title: "The big day",
-      items: [
-        {
-          to: `${base}/event-day`,
-          label: "Event Day",
-          icon: <PartyPopper className="h-4 w-4" />,
-        },
-      ],
-    },
+    { items: [{ to: `${base}/event-day`, label: "Event day", icon: icon(PartyPopper) }] },
   ];
+}
+
+/** Menu vs. caterers live on two pages; this switch makes them feel like one. */
+function FoodTabs({ base, path }: { base: string; path: string }) {
+  const tabs = [
+    { to: `${base}/catering`, label: "Menu & quantities" },
+    { to: `${base}/caterers`, label: "Caterers & booking" },
+  ];
+  return (
+    <nav aria-label="Food & catering" className="mb-4 inline-flex rounded-xl border border-sand-200 bg-white p-1 shadow-sm">
+      {tabs.map((t) => {
+        const active = path === t.to;
+        return (
+          <Link
+            key={t.to}
+            to={t.to}
+            aria-current={active ? "page" : undefined}
+            className={classNames(
+              "rounded-lg px-3.5 py-1.5 text-sm font-medium transition",
+              active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-sand-50"
+            )}
+          >
+            {t.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 }
 
 export default function EventLayout() {
   const { eventId } = useParams();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   if (!eventId) return <Outlet />;
 
-  const navGroups = groups(eventId);
+  const base = `/events/${eventId}`;
+  const path = pathname.replace(/\/+$/, "");
+  const groups = navGroups(eventId);
+  const showFoodTabs = path === `${base}/catering` || path === `${base}/caterers`;
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-8">
       {/* Mobile toggle */}
       <button
+        type="button"
         className="btn-secondary fixed bottom-4 right-4 z-30 shadow-lg lg:hidden"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Toggle event menu"
+        aria-label={open ? "Close event menu" : "Open event menu"}
+        aria-expanded={open}
       >
         {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         Menu
@@ -128,23 +122,20 @@ export default function EventLayout() {
       {/* Sidebar */}
       <aside
         className={classNames(
-          "w-60 shrink-0",
-          "lg:block",
+          "w-52 shrink-0 lg:block",
           open
-            ? "fixed inset-y-0 left-0 z-20 block w-64 overflow-y-auto border-r border-slate-200 bg-white p-4 pt-20"
+            ? "fixed inset-y-0 left-0 z-20 block w-64 overflow-y-auto border-r border-sand-200 bg-white p-4 pt-20"
             : "hidden"
         )}
       >
-        <nav className="sticky top-24 space-y-6" aria-label="Event sections">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <CalendarClock className="h-4 w-4 text-brand-600" />
-            Event workspace
-          </div>
-          {navGroups.map((g) => (
-            <div key={g.title}>
-              <p className="mb-1.5 px-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                {g.title}
-              </p>
+        <nav className="sticky top-24 space-y-5" aria-label="Event sections">
+          {groups.map((g, gi) => (
+            <div key={g.title ?? `g${gi}`}>
+              {g.title && (
+                <p className="mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  {g.title}
+                </p>
+              )}
               <ul className="space-y-0.5">
                 {g.items.map((item) => (
                   <li key={item.to}>
@@ -152,14 +143,13 @@ export default function EventLayout() {
                       to={item.to}
                       end={item.end}
                       onClick={() => setOpen(false)}
-                      className={({ isActive }) =>
-                        classNames(
+                      className={({ isActive }) => {
+                        const active = isActive || !!item.also?.includes(path);
+                        return classNames(
                           "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition",
-                          isActive
-                            ? "bg-brand-50 text-brand-700"
-                            : "text-slate-600 hover:bg-slate-50"
-                        )
-                      }
+                          active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-sand-50 hover:text-slate-900"
+                        );
+                      }}
                     >
                       {item.icon}
                       {item.label}
@@ -182,6 +172,7 @@ export default function EventLayout() {
       )}
 
       <div className="min-w-0 flex-1">
+        {showFoodTabs && <FoodTabs base={base} path={path} />}
         <Outlet />
       </div>
     </div>

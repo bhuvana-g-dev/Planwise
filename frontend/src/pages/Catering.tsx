@@ -218,8 +218,8 @@ export default function Catering() {
       <div style={{ ["--i" as string]: 0 }}>
         <ModuleHeader
           theme={theme}
-          eyebrow="Catering & menu"
-          title="Catering & menu"
+          eyebrow="Food & catering"
+          title="Menu & quantities"
           subtitle={`${hc.catering_headcount} servings · ${formatINR(
             s.cost_per_guest_paise
           )} per guest`}

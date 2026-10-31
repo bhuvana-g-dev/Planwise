@@ -245,7 +245,7 @@ export default function Caterers() {
       <div style={{ ["--i" as string]: 0 }}>
         <ModuleHeader
           theme={theme}
-          eyebrow="Caterers & booking"
+          eyebrow="Food & catering"
           title="Caterers & booking"
           subtitle={`Find real caterers, compare quotes and keep catering in your budget — for ${ov.headcount.count} guests.`}
           art={<CateringArt className="h-16 w-16" />}
