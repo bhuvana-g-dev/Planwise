@@ -38,15 +38,32 @@ export async function svgToPng(svg: SVGSVGElement): Promise<Blob> {
   }
 }
 
-export function downloadBlob(blob: Blob, filename: string) {
+// The most recent download URL. It is NOT revoked right after click(): when
+// the browser asks where to save (or scans the file) it reads the blob later,
+// and a revoked URL makes it write an empty file ("nothing to show" in
+// Photos). It's freed on the next download or when the page goes away.
+let lastDownloadUrl: string | null = null;
+
+function releaseDownloadUrl() {
+  if (lastDownloadUrl) URL.revokeObjectURL(lastDownloadUrl);
+  lastDownloadUrl = null;
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", releaseDownloadUrl);
+}
+
+export function downloadBlob(blob: Blob, filename: string): void {
+  releaseDownloadUrl();
   const url = URL.createObjectURL(blob);
+  lastDownloadUrl = url;
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.rel = "noopener";
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export function invitationFilename(name: string): string {

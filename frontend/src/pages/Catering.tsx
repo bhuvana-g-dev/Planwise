@@ -200,7 +200,7 @@ export default function Catering() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-9 w-56" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-20 w-full" />
           ))}
@@ -241,7 +241,7 @@ export default function Catering() {
 
       {/* Headcount + cost summary */}
       <div
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
         style={{ ["--i" as string]: 1 }}
       >
         <Stat label="Planned guests" value={hc.planned_guests.toString()} />

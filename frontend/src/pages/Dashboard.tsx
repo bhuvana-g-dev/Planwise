@@ -108,9 +108,10 @@ export default function Dashboard() {
             <p className="text-sm text-slate-500">
               {greeting(user?.displayName ?? user?.email)}
             </p>
-            <div className="mt-1 flex items-center gap-3">
+            {/* Wraps on phones so the event name is never cut to "Priya …". */}
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
               <EventTypeSticker type={event.event_type} size={34} />
-              <h1 className="truncate text-3xl font-bold text-slate-900">
+              <h1 className="min-w-0 break-words text-2xl font-bold text-slate-900 sm:truncate sm:text-3xl">
                 {event.name}
               </h1>
               <Badge tone="brand">{event.event_type}</Badge>

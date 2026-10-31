@@ -171,7 +171,8 @@ export default function EventLayout() {
         />
       )}
 
-      <div className="min-w-0 flex-1">
+      {/* Bottom padding on phones so the floating Menu button never covers the last content. */}
+      <div className="min-w-0 flex-1 pb-20 lg:pb-0">
         {showFoodTabs && <FoodTabs base={base} path={path} />}
         <Outlet />
       </div>

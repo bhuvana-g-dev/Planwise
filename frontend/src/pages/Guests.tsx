@@ -114,7 +114,7 @@ export default function Guests() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-9 w-56" />
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-20 w-full" />
           ))}
@@ -156,7 +156,7 @@ export default function Guests() {
       {error && <ErrorBanner message={error} />}
 
       {summary && (
-        <div className="grid gap-4 sm:grid-cols-4" style={{ ["--i" as string]: 1 }}>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4" style={{ ["--i" as string]: 1 }}>
           <Stat label="Guests (rows)" value={summary.total_guests} />
           <Stat label="Confirmed heads" value={summary.confirmed_headcount} />
           <Stat
@@ -226,7 +226,7 @@ export default function Guests() {
                 <tr key={i} className="transition hover:bg-sand-50">
                   <td className="px-4 py-2">
                     <input
-                      className="input"
+                      className="input min-w-[10rem]"
                       value={g.name}
                       placeholder="Guest name"
                       onChange={(e) => update(i, { name: e.target.value })}
@@ -244,7 +244,7 @@ export default function Guests() {
                   </td>
                   <td className="px-4 py-2">
                     <input
-                      className="input"
+                      className="input min-w-[8rem]"
                       value={g.group}
                       placeholder="family / friends"
                       onChange={(e) => update(i, { group: e.target.value })}
@@ -253,7 +253,7 @@ export default function Guests() {
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2">
                       <select
-                        className="input"
+                        className="input min-w-[8rem]"
                         value={g.rsvp}
                         onChange={(e) =>
                           update(i, { rsvp: e.target.value as RsvpStatus })
@@ -281,7 +281,7 @@ export default function Guests() {
                   </td>
                   <td className="px-4 py-2">
                     <input
-                      className="input"
+                      className="input min-w-[9rem]"
                       value={g.dietary.join(", ")}
                       placeholder="veg, nut-allergy"
                       onChange={(e) =>
@@ -312,7 +312,7 @@ export default function Guests() {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2 [&>button]:whitespace-nowrap">
         <button
           className="btn-secondary"
           onClick={() => setRows((r) => [...r, blankGuest()])}
