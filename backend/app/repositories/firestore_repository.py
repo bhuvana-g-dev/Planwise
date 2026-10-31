@@ -174,6 +174,16 @@ class FirestoreRepository(Repository):
             .collection("meta").document("caterers").get()
         return doc.to_dict().get("store") if doc.exists else None
 
+    def get_invitation(self, event_id: str) -> Optional[dict]:
+        doc = self.db.collection("events").document(event_id) \
+            .collection("meta").document("invitation").get()
+        return doc.to_dict().get("design") if doc.exists else None
+
+    def save_invitation(self, event_id: str, design: dict) -> dict:
+        self.db.collection("events").document(event_id) \
+            .collection("meta").document("invitation").set({"design": design})
+        return design
+
     def save_caterers(self, event_id: str, store: dict) -> dict:
         self.db.collection("events").document(event_id) \
             .collection("meta").document("caterers").set({"store": store})

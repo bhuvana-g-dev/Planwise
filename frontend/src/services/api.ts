@@ -11,6 +11,9 @@ import type {
   GuestImportResult,
   GuestSummary,
   InterpretReplanResult,
+  InvitationDesign,
+  InvitationTone,
+  InvitationWording,
   Plan,
   PriceBandsInfo,
   VenueQuote,
@@ -147,6 +150,22 @@ export const api = {
     request<GuestImportResult>(`/api/events/${id}/guests/import`, {
       method: "POST",
       body: JSON.stringify({ contacts, group, source }),
+    }),
+
+  getInvitation: (id: string) =>
+    request<{ design: InvitationDesign | null }>(`/api/events/${id}/invitation`),
+
+  saveInvitation: (id: string, design: InvitationDesign) =>
+    request<{ design: InvitationDesign }>(`/api/events/${id}/invitation`, {
+      method: "PUT",
+      body: JSON.stringify(design),
+    }),
+
+  /** AI headline + message suggestion. Never saved by the server. */
+  suggestInvitationWording: (id: string, tone: InvitationTone, details: string) =>
+    request<InvitationWording>(`/api/events/${id}/invitation/wording`, {
+      method: "POST",
+      body: JSON.stringify({ tone, details }),
     }),
 
   getCatering: (id: string) =>

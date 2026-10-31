@@ -11,6 +11,7 @@ from app.models.catering import CateringPlan, CateringPreferences
 from app.models.change import ReplanRequest
 from app.models.event import EventCreate
 from app.models.guest import GuestCreate, GuestImportRequest
+from app.models.invitation import InvitationDesign, InvitationWordingRequest
 from app.models.plan import VendorQuote
 from app.models.venue import VenueCreate, VenueQuery, VenueQuoteInput
 from app.services import event_service
@@ -442,6 +443,39 @@ def get_caterer_provider(provider_id: str):
         raise HTTPException(status.HTTP_404_NOT_FOUND,
                             "Provider not found — search again to refresh.")
     return provider.model_dump(mode="json")
+
+
+# --------------------------------------------------------------------------
+# Invitations: one saved card design per event + AI-assisted wording
+# --------------------------------------------------------------------------
+@router.get("/events/{event_id}/invitation")
+def get_invitation(event_id: str, owner=Depends(get_current_owner)):
+    from app.services import invitation_service
+    try:
+        return {"design": invitation_service.get_design(event_id, owner)}
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.put("/events/{event_id}/invitation")
+def save_invitation(event_id: str, payload: InvitationDesign,
+                    owner=Depends(get_current_owner)):
+    from app.services import invitation_service
+    try:
+        return {"design": invitation_service.save_design(event_id, payload, owner)}
+    except Exception as exc:
+        _handle(exc)
+
+
+@router.post("/events/{event_id}/invitation/wording")
+def suggest_invitation_wording(event_id: str, payload: InvitationWordingRequest,
+                               owner=Depends(get_current_owner)):
+    """Suggest a headline + message. Not saved; the user reviews it first."""
+    from app.services import invitation_service
+    try:
+        return invitation_service.suggest_wording(event_id, payload, owner)
+    except Exception as exc:
+        _handle(exc)
 
 
 class CatererCreatePayload(BaseModel):

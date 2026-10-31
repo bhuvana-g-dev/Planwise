@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ContactRound, Plus, Save, Trash2 } from "lucide-react";
+import { ContactRound, Mail, Plus, Save, Trash2 } from "lucide-react";
 import { api, ApiError } from "../services/api";
 import type { Guest, GuestImportResult, GuestSummary, RsvpStatus } from "../types";
 import ContactImportDialog from "../components/guests/ContactImportDialog";
@@ -145,8 +145,8 @@ export default function Guests() {
               >
                 <ContactRound className="h-4 w-4" /> Import contacts
               </button>
-              <Link to={`/events/${eventId}`} className="btn-secondary">
-                Back to dashboard
+              <Link to={`/events/${eventId}/invitations`} className="btn-secondary">
+                <Mail className="h-4 w-4" /> Invitation
               </Link>
             </>
           }

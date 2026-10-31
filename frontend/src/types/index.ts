@@ -659,3 +659,26 @@ export interface CatererBudgetPreview {
   };
   warnings: string[];
 }
+
+// --- Invitations ---
+export type InvitationTone = "warm" | "formal" | "fun" | "traditional";
+
+export interface InvitationDesign {
+  template_id: string;
+  eyebrow: string;
+  headline: string;
+  hosts: string;
+  message: string;
+  date_text: string;
+  time_text: string;
+  venue_text: string;
+  dress_code: string;
+  rsvp_text: string;
+}
+
+export interface InvitationWording {
+  headline: string;
+  message: string;
+  tone: InvitationTone;
+  generated_by: "gemini" | "deterministic";
+}
