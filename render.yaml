@@ -19,9 +19,10 @@ services:
       # The Firebase *Project ID* (Project settings > General), not the name.
       - key: FIREBASE_PROJECT_ID
         sync: false
-      # Upload the service-account key as a Render Secret File named
-      # serviceAccount.json; Render mounts it at this path.
+      # Set in the dashboard, never here. Either paste the full service-account
+      # JSON, or add a Secret File named serviceAccount.json and use
+      # /etc/secrets/serviceAccount.json. The backend accepts both.
       - key: GOOGLE_APPLICATION_CREDENTIALS
-        value: /etc/secrets/serviceAccount.json
+        sync: false
       - key: REQUIRE_AUTH
         value: "false"
